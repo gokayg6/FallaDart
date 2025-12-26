@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,10 +10,9 @@ import '../../core/constants/app_strings.dart';
 import '../../core/providers/user_provider.dart';
 import '../../core/providers/language_provider.dart';
 import '../../core/services/ai_service.dart';
-import '../../core/widgets/mystical_loading.dart' as loading;
 import '../../core/widgets/mystical_card.dart';
+import '../../core/widgets/mystical_loading.dart' as loading;
 import '../../core/widgets/mystical_button.dart';
-import '../../core/widgets/glassmorphism_components.dart';
 import '../../core/models/fortune_model.dart' as fm;
 import 'horoscope_detail_screen.dart';
 import '../fortune/fortune_result_screen.dart';
@@ -22,7 +20,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/utils/share_utils.dart';
 import '../../widgets/fortune/karma_cost_badge.dart';
 import '../../providers/theme_provider.dart';
-import '../../widgets/ads/banner_ad_widget.dart';
 
 extension DateTimeExtension on DateTime {
   int get dayOfYear {
@@ -109,13 +106,13 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
   void initState() {
     super.initState();
     _initializeLocale();
-    // Initialize language code
-    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-    _lastLanguageCode = languageProvider.languageCode;
-    
-    // Direkt yükle (addPostFrameCallback gecikme yaratıyor)
-    _initializeUserZodiac();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeUserZodiac();
     _loadHoroscopes();
+      // Initialize language code
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      _lastLanguageCode = languageProvider.languageCode;
+    });
   }
 
   void _initializeUserZodiac() {
@@ -329,94 +326,59 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
     try {
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
       final isEnglish = languageProvider.isEnglish;
-      final docRef = _firestore.collection('horoscopes').doc(docKey);
+      final resultJson = await _ai.generateBatchDailyHoroscopes(date: date, period: period, english: isEnglish);
       
-      // Önce cache'den oku
-      final doc = await docRef.get();
-      final textKey = isEnglish ? 'texts_en' : 'texts';
-      Map<String, dynamic>? existingTexts;
+      // Robust JSON extraction
+      String jsonStr = resultJson.trim();
+      final startIndex = jsonStr.indexOf('{');
+      final endIndex = jsonStr.lastIndexOf('}');
       
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        if (data.containsKey(textKey)) {
-          existingTexts = Map<String, dynamic>.from(data[textKey] ?? {});
-        }
+      if (startIndex != -1 && endIndex != -1) {
+        jsonStr = jsonStr.substring(startIndex, endIndex + 1);
+      } else {
+        // Fallback cleanup if braces not found (unlikely for valid JSON)
+        jsonStr = jsonStr.replaceAll('```json', '').replaceAll('```', '').trim();
       }
       
-      // Use Firestore transaction to ensure only one user generates (API tasarrufu)
-      await _firestore.runTransaction((transaction) async {
-        final freshDoc = await transaction.get(docRef);
-        final freshData = freshDoc.data();
-        
-        // Check if data already exists
-        if (freshData != null && freshData.containsKey(textKey)) {
-          final freshTexts = Map<String, dynamic>.from(freshData[textKey] ?? {});
-          if (freshTexts.isNotEmpty) {
-            // Data already exists, skip generation
-            existingTexts = freshTexts;
-            return;
-          }
-        }
-        
-        // Generate horoscopes (only first user will reach here)
-        final resultJson = await _ai.generateBatchDailyHoroscopes(date: date, period: period, english: isEnglish);
-        
-        // Robust JSON extraction
-        String jsonStr = resultJson.trim();
-        final startIndex = jsonStr.indexOf('{');
-        final endIndex = jsonStr.lastIndexOf('}');
-        
-        if (startIndex != -1 && endIndex != -1) {
-          jsonStr = jsonStr.substring(startIndex, endIndex + 1);
-        } else {
-          jsonStr = jsonStr.replaceAll('```json', '').replaceAll('```', '').trim();
-        }
-        
-        Map<String, dynamic> parsedData;
-        try {
-          parsedData = Map<String, dynamic>.from(jsonDecode(jsonStr));
-        } catch (e) {
-          debugPrint('JSON Parse Error: $e');
-          debugPrint('Raw JSON: $jsonStr');
-          parsedData = {};
-        }
-        
-        if (parsedData.isNotEmpty) {
-          // Convert parsedData to language-specific format
-          final Map<String, String> texts = {};
-          final Map<String, String> shorts = {};
-          parsedData.forEach((key, value) {
-            if (value is Map) {
-              texts[key] = value['text']?.toString() ?? '';
-              final fullText = value['text']?.toString() ?? '';
-              shorts[key] = _summarizeShort(fullText);
-            } else {
-              texts[key] = value.toString();
-              shorts[key] = _summarizeShort(value.toString());
-            }
-          });
-          
-          // Save to Firestore
-          transaction.set(docRef, {
-            'date': date.toIso8601String(),
-            'period': period,
-            'horoscopes': parsedData, // Keep original format for stats
-            textKey: texts,
-            'shorts': shorts,
-            'shorts_en': shorts, // For both languages
-            'texts': texts, // For both languages
-            'texts_en': texts, // For both languages
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          
-          existingTexts = texts;
-        }
-      });
+      Map<String, dynamic> parsedData;
+      try {
+        parsedData = Map<String, dynamic>.from(jsonDecode(jsonStr));
+      } catch (e) {
+        debugPrint('JSON Parse Error: $e');
+        debugPrint('Raw JSON: $jsonStr');
+        parsedData = {};
+      }
       
-      // State'i güncelle (tekrar _loadHoroscopes çağırmak yerine direkt güncelle)
-      final textsToUse = existingTexts;
-      if (textsToUse != null && textsToUse.isNotEmpty) {
+      if (parsedData.isNotEmpty) {
+        // Save to Firestore with language-specific keys
+        final textKey = isEnglish ? 'texts_en' : 'texts';
+        final shortKey = isEnglish ? 'shorts_en' : 'shorts';
+        
+        // Convert parsedData to language-specific format
+        final Map<String, String> texts = {};
+        final Map<String, String> shorts = {};
+        parsedData.forEach((key, value) {
+          if (value is Map) {
+            texts[key] = value['text']?.toString() ?? '';
+            // Generate short version
+            final fullText = value['text']?.toString() ?? '';
+            shorts[key] = _summarizeShort(fullText);
+          } else {
+            texts[key] = value.toString();
+            shorts[key] = _summarizeShort(value.toString());
+          }
+        });
+        
+        await _firestore.collection('horoscopes').doc(docKey).set({
+          'date': date.toIso8601String(),
+          'period': period,
+          'horoscopes': parsedData, // Keep original format for stats
+          textKey: texts,
+          shortKey: shorts,
+          'createdAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        
+        // Update UI
         final Map<String, String> mappedHoroscopes = {};
         final Map<String, Map<String, int>> mappedStats = {};
         final englishToTurkish = {
@@ -434,9 +396,21 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
           'Pisces': AppStrings.pisces,
         };
         
-        textsToUse.forEach((key, value) {
+        parsedData.forEach((key, value) {
           final trKey = englishToTurkish[key] ?? key;
-          mappedHoroscopes[trKey] = value.toString();
+          if (value is Map) {
+            mappedHoroscopes[trKey] = value['text']?.toString() ?? '';
+            if (value['stats'] is Map) {
+              final stats = value['stats'] as Map;
+              mappedStats[trKey] = {
+                'love': (stats['love'] as num?)?.toInt() ?? 50,
+                'career': (stats['career'] as num?)?.toInt() ?? 50,
+                'health': (stats['health'] as num?)?.toInt() ?? 50,
+              };
+            }
+          } else {
+            mappedHoroscopes[trKey] = value.toString();
+          }
         });
         
         if (mounted) {
@@ -447,13 +421,24 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
           });
         }
       } else {
-        // Fallback - tekrar yükle
-        await _loadHoroscopes();
-      }
-    } catch (e) {
-      // Fallback - tekrar yükle
-      await _loadHoroscopes();
+        throw Exception('Empty AI response');
     }
+    } catch (e) {
+      // Fallback
+      final zodiacList = _getZodiacList();
+      final signs = zodiacList.map((z) => z['name']!).toList();
+      final newHoroscopes = <String, String>{};
+      for (final sign in signs) {
+        newHoroscopes[sign] = _getDefaultHoroscope(sign);
+      }
+    if (mounted) {
+      setState(() {
+        _horoscopes = newHoroscopes;
+          _horoscopeStats = {};
+        _loadingHoroscopes = false;
+      });
+    }
+  }
   }
 
   String _getDefaultHoroscope(String sign) {
@@ -637,177 +622,89 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
         }
         _lastLanguageCode = currentLanguageCode;
     
-    return PremiumScaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(zodiacSign, isDark),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildNatalChartSection(user, isDark),
-                    const SizedBox(height: 24),
-                    _buildDailyHoroscopesSection(isDark),
-                    const SizedBox(height: 16),
-                    const BannerAdWidget(
-                      margin: EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ],
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+            decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
+        child: SafeArea(
+          child: Column(
+            children: [
+                  _buildHeader(zodiacSign, isDark),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                          _buildNatalChartSection(user, isDark),
+                      const SizedBox(height: 24),
+                          _buildDailyHoroscopesSection(isDark),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    );
+        );
       },
     );
   }
 
   Widget _buildHeader(String zodiacSign, bool isDark) {
-    return RepaintBoundary(
-      child: ClipRRect(
-        child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: isDark 
-                ? LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withOpacity(0.12),
-                      Colors.white.withOpacity(0.05),
-                    ],
-                  )
-                : AppColors.champagneGoldGradient.scale(0.8),
-             border: Border(
-              bottom: BorderSide(
-                color: isDark ? AppColors.champagneGold.withOpacity(0.2) : AppColors.champagneGold.withOpacity(0.5),
-                width: 1,
+    final textColor = AppColors.getTextPrimary(isDark);
+    
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(Icons.arrow_back, color: textColor),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+            AppStrings.astrology,
+            style: AppTextStyles.headingLarge.copyWith(color: textColor),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+          ),
+          ),
+          const SizedBox(width: 8),
+          const KarmaCostBadge(fortuneType: 'astrology'),
+          if (zodiacSign != AppStrings.notSpecified) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.primary.withOpacity(0.5)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    _zodiacAssetFor(zodiacSign),
+                    width: 18,
+                    height: 18,
+                    errorBuilder: (_, __, ___) => const Text('♈', style: TextStyle(fontSize: 16)),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    zodiacSign,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.05),
-                        isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isDark ? Colors.white.withOpacity(0.1) : AppColors.premiumLightTextSecondary.withOpacity(0.2),
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.arrow_back_ios_new,
-                    color: AppColors.getIconColor(isDark),
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.champagneGold.withOpacity(0.3),
-                            AppColors.champagneGold.withOpacity(0.1),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.star, color: AppColors.champagneGold, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppStrings.astrology,
-                            style: TextStyle(
-                              fontFamily: 'SF Pro Display',
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.getTextPrimary(isDark),
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          Text(
-                            'Yıldızların Rehberliği',
-                            style: TextStyle(
-                              fontFamily: 'SF Pro Text',
-                              fontSize: 12,
-                              color: AppColors.getTextSecondary(isDark),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (zodiacSign != AppStrings.notSpecified) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.champagneGold.withOpacity(0.3),
-                        AppColors.champagneGold.withOpacity(0.15),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.champagneGold.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset(
-                        _zodiacAssetFor(zodiacSign),
-                        width: 16,
-                        height: 16,
-                        errorBuilder: (_, __, ___) => const Text('♈', style: TextStyle(fontSize: 14)),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        zodiacSign,
-                        style: TextStyle(
-                          fontFamily: 'SF Pro Text',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.champagneGold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(width: 8),
-              const KarmaCostBadge(fortuneType: 'astrology'),
-            ],
-          ),
-        ),
-      ),
+          ],
+        ],
       ),
     );
   }
@@ -828,20 +725,12 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDark 
-              ? [
-                  AppColors.secondary.withValues(alpha: 0.2),
-                  cardBg.withValues(alpha: 0.8),
-                ]
-              : [
-                  AppColors.premiumLightSurface,
-                  AppColors.premiumLightSurface.withOpacity(0.8),
-                ],
+            colors: [
+              AppColors.secondary.withValues(alpha: isDark ? 0.2 : 0.15),
+              cardBg.withValues(alpha: isDark ? 0.8 : 0.95),
+            ],
           ),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark ? Colors.transparent : AppColors.premiumLightTextSecondary.withOpacity(0.1),
-          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -871,7 +760,7 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: (isDark ? AppColors.surfaceColor : AppColors.premiumLightTextSecondary.withOpacity(0.05)),
+                  color: (isDark ? AppColors.surfaceColor : Colors.grey[200]!).withOpacity(0.35),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -940,7 +829,7 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: (isDark ? Colors.white : AppColors.premiumLightTextSecondary).withOpacity(0.1),
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: SingleChildScrollView(
@@ -966,7 +855,7 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
-                  color: (isDark ? Colors.white : AppColors.premiumLightTextSecondary).withOpacity(0.1),
+                  color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.primary.withOpacity(0.5), width: 2),
                   boxShadow: [
@@ -1027,7 +916,7 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
           margin: const EdgeInsets.symmetric(vertical: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: (isDark ? Colors.white : AppColors.premiumLightTextSecondary).withOpacity(0.05),
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -1202,9 +1091,9 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 4),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? (isDark ? Colors.white : AppColors.premiumLightTextSecondary).withOpacity(0.2) : Colors.transparent,
+          color: selected ? (isDark ? Colors.white : Colors.black).withOpacity(0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: selected ? (isDark ? Colors.white54 : AppColors.premiumLightTextSecondary.withOpacity(0.5)) : Colors.transparent),
+          border: Border.all(color: selected ? (isDark ? Colors.white54 : Colors.black38) : Colors.transparent),
         ),
         child: Text(
           label,
@@ -1269,12 +1158,12 @@ class _AstrologyScreenState extends State<AstrologyScreen> {
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: (isDark ? Colors.white : AppColors.premiumLightTextSecondary).withOpacity(0.15),
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.15),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: (isDark ? Colors.black : AppColors.premiumLightTextSecondary).withOpacity(0.15),
+              color: (isDark ? Colors.black : Colors.grey[400]!).withOpacity(0.3),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),

@@ -108,25 +108,21 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
-    // ThemeProvider'ı try-catch içinde al, çünkü splash'te bazen context hazır olmayabilir
-    LinearGradient bgGradient = AppColors.premiumDarkGradient;
-    try {
-      bgGradient = Provider.of<ThemeProvider>(context).backgroundGradient;
-    } catch (_) {}
-
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(
-          gradient: bgGradient,
+          gradient: themeProvider.backgroundGradient,
         ),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Logo with animations
               AnimatedBuilder(
                 animation: Listenable.merge([
                   _logoScaleAnimation,
@@ -137,132 +133,56 @@ class _SplashScreenState extends State<SplashScreen>
                     scale: _logoScaleAnimation.value,
                     child: Transform.rotate(
                       angle: _logoRotationAnimation.value,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Outer glow ring
-                          Container(
-                            width: 160,
-                            height: 160,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  AppColors.mysticPurpleAccent.withOpacity(0.3),
-                                  AppColors.mysticMagenta.withOpacity(0.15),
-                                  Colors.transparent,
-                                ],
-                                stops: const [0.3, 0.6, 1.0],
-                              ),
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.5),
+                              blurRadius: 30,
+                              spreadRadius: 10,
                             ),
-                          ),
-                          // Main logo container with glassmorphism
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  AppColors.mysticPurpleAccent.withOpacity(0.8),
-                                  AppColors.mysticMagenta.withOpacity(0.6),
-                                ],
-                              ),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.3),
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.mysticPurpleAccent.withOpacity(0.5),
-                                  blurRadius: 40,
-                                  spreadRadius: 10,
-                                ),
-                                BoxShadow(
-                                  color: AppColors.mysticMagenta.withOpacity(0.3),
-                                  blurRadius: 60,
-                                  spreadRadius: 20,
-                                ),
-                              ],
-                            ),
-                            padding: const EdgeInsets.all(24),
-                            child: CachedFallaLogo(
-                              size: 72,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(20),
+                        child: CachedFallaLogo(
+                          size: 80,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   );
                 },
               ),
               
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
               
-              // App name with fade and shimmer
+              // App name with fade
               FadeTransition(
                 opacity: _fadeAnimation,
-                child: ShaderMask(
-                  shaderCallback: (bounds) => LinearGradient(
-                    colors: [
-                      Colors.white,
-                      AppColors.mysticLavender,
-                      Colors.white,
-                    ],
-                  ).createShader(bounds),
-                  child: const Text(
-                    'Falla',
-                    style: TextStyle(
-                      fontSize: 42,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 4,
-                    ),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Subtitle
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Text(
-                  'Mistik Fal & Astroloji',
+                child: const Text(
+                  'Falla',
                   style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                     letterSpacing: 2,
                   ),
                 ),
               ),
               
-              const SizedBox(height: 56),
+              const SizedBox(height: 48),
               
-              // Loading indicator with purple glow
+              // Loading indicator
               FadeTransition(
                 opacity: _fadeAnimation,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.mysticPurpleAccent.withOpacity(0.4),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: MysticalLoading(
-                    type: MysticalLoadingType.spinner,
-                    size: 40,
-                    color: AppColors.mysticPurpleAccent,
-                  ),
+                child: MysticalLoading(
+                  type: MysticalLoadingType.spinner,
+                  size: 32,
+                  color: AppColors.primary,
                 ),
               ),
             ],

@@ -74,12 +74,13 @@ flutter:
     - assets/karma/
     - assets/yüz/
     - assets/gif/
-    -  assets/gif/populer_testler/
-    - assets/gif/populer_testler/kisilik_testi/
-    - assets/gif/populer_testler/arkadaslik_testi/
-    - assets/gif/populer_testler/ask_testi/
-    - assets/gif/populer_testler/iliski_uyum_testi/
-    - assets/gif/populer_testler/iliskinde_gercekten_ne_istiyorsun/
+    - assets/quest_icons/
+    - assets/gif/Popüler Testler/
+    - assets/gif/Popüler Testler/Kişilik Testi/
+    - assets/gif/Popüler Testler/Arkadaşlık Testi/
+    - assets/gif/Popüler Testler/Aşk Testi/
+    - assets/gif/Popüler Testler/İlişki Uyum Testi/
+    - assets/gif/Popüler Testler/İlişkinde Gerçekten Ne İstiyorsun/
     - assets/gif/Aşkta Kırmızı Bayrakları Görebiliyor musun/
     - assets/gif/Burcuna göre ne kadar eğlencelisi/
     - assets/gif/buruna göre nekadar kaotiksin/

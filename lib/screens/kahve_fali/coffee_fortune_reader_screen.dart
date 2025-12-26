@@ -32,7 +32,7 @@ class CoffeeFortuneReaderScreen extends StatelessWidget {
     final isDark = themeProvider.isDarkMode;
     
     return Scaffold(
-      backgroundColor: AppColors.getBackground(isDark),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text('Fal Gönderiliyor', style: TextStyle(color: AppColors.getTextPrimary(isDark))),
         backgroundColor: Colors.transparent,
@@ -40,7 +40,9 @@ class CoffeeFortuneReaderScreen extends StatelessWidget {
         elevation: 0,
         centerTitle: true,
       ),
-      body: ListView(
+      body: Container(
+        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
+        child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
         children: [
           _userInfoCard(context),
@@ -112,7 +114,8 @@ class CoffeeFortuneReaderScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _userInfoCard(BuildContext context) {

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
@@ -60,13 +59,7 @@ class _TestResultScreenState extends State<TestResultScreen>
         onAdFailedToLoad: (_) => loaded.complete(false),
       );
       bool ok = false;
-      try { 
-        ok = await loaded.future.timeout(const Duration(seconds: 2)); 
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('Ad load timeout or error: $e');
-        }
-      }
+      try { ok = await loaded.future.timeout(const Duration(seconds: 2)); } catch (_) {}
       if (ok && mounted) {
         await _ads.showInterstitialAd();
       }
@@ -183,13 +176,7 @@ class _TestResultScreenState extends State<TestResultScreen>
         onAdFailedToLoad: (_) => loaded.complete(false),
       );
       bool ok = false;
-      try { 
-        ok = await loaded.future.timeout(const Duration(seconds: 2)); 
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('Ad load timeout or error: $e');
-        }
-      }
+      try { ok = await loaded.future.timeout(const Duration(seconds: 2)); } catch (_) {}
       
       if (ok) {
         // Show rewarded ad and wait for reward

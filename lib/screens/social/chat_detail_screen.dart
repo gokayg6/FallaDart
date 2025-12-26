@@ -223,7 +223,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
-          decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
+        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
         child: SafeArea(
           child: Column(
             children: [
@@ -284,10 +284,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       padding: const EdgeInsets.all(16),
                       itemCount: messages.length,
                       itemBuilder: (context, index) {
-                        final doc = messages[index];
-                        final message = doc.data() as Map<String, dynamic>;
+                        final message = messages[index].data() as Map<String, dynamic>;
                         final isMe = message['senderId'] == currentUserId;
-                        return _buildMessageBubble(doc.id, message, isMe);
+                        return _buildMessageBubble(message, isMe);
                       },
                     );
                   },
@@ -409,166 +408,89 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  Widget _buildMessageBubble(String messageId, Map<String, dynamic> message, bool isMe) {
+  Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe) {
     final text = message['text'] as String? ?? '';
     final timestamp = message['timestamp'] as Timestamp?;
     final time = timestamp != null
         ? '${timestamp.toDate().hour.toString().padLeft(2, '0')}:${timestamp.toDate().minute.toString().padLeft(2, '0')}'
         : '';
 
-    final children = <Widget>[];
-
-    if (!isMe) {
-      children.add(
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: AppColors.primary.withValues(alpha: 0.3),
-          child: Text(
-            widget.otherUser.name.isNotEmpty
-                ? widget.otherUser.name[0].toUpperCase()
-                : '?',
-            style: const TextStyle(color: Colors.white, fontSize: 12),
-          ),
-        ),
-      );
-      children.add(const SizedBox(width: 8));
-    }
-
-    children.add(
-      Flexible(
-        child: GestureDetector(
-          onLongPress: () => _onReportMessage(messageId, message),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              gradient: isMe
-                  ? LinearGradient(
-                      colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
-                    )
-                  : LinearGradient(
-                      colors: [
-                        AppColors.cardBackground.withValues(alpha: 0.8),
-                        AppColors.cardBackground.withValues(alpha: 0.6),
-                      ],
-                    ),
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isMe ? 16 : 4),
-                bottomRight: Radius.circular(isMe ? 4 : 16),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        text,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.flag_outlined,
-                        size: 16,
-                        color: Colors.white70,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () => _onReportMessage(messageId, message),
-                      tooltip: AppStrings.isEnglish ? 'Report message' : 'Mesajı bildir',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  time,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: Colors.white54,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    if (isMe) {
-      children.add(const SizedBox(width: 8));
-      children.add(
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: AppColors.secondary.withValues(alpha: 0.3),
-          child: Text(
-            Provider.of<UserProvider>(context, listen: false).user?.name.isNotEmpty == true
-                ? Provider.of<UserProvider>(context, listen: false).user!.name[0].toUpperCase()
-                : 'S',
-            style: const TextStyle(color: Colors.white, fontSize: 12),
-          ),
-        ),
-      );
-    }
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: children,
+        children: [
+          if (!isMe) ...[
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.3),
+              child: Text(
+                widget.otherUser.name.isNotEmpty
+                    ? widget.otherUser.name[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: isMe
+                    ? LinearGradient(
+                        colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
+                      )
+                    : LinearGradient(
+                        colors: [
+                          AppColors.cardBackground.withValues(alpha: 0.8),
+                          AppColors.cardBackground.withValues(alpha: 0.6),
+                        ],
+                      ),
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: Radius.circular(isMe ? 16 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 16),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    time,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: Colors.white54,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isMe) ...[
+            const SizedBox(width: 8),
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.secondary.withValues(alpha: 0.3),
+              child: Text(
+                Provider.of<UserProvider>(context, listen: false).user?.name.isNotEmpty == true
+                    ? Provider.of<UserProvider>(context, listen: false).user!.name[0].toUpperCase()
+                    : 'S',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+          ],
+        ],
       ),
     );
-  }
-
-  Future<void> _onReportMessage(String messageId, Map<String, dynamic> message) async {
-    if (_chatId == null) return;
-
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return;
-
-    try {
-      await _firestore.collection('reports').add({
-        'type': 'chat_message',
-        'chatId': _chatId,
-        'messageId': messageId,
-        'messageText': message['text'] ?? '',
-        'senderId': message['senderId'] ?? '',
-        'reportedBy': currentUser.uid,
-        'reportedAt': FieldValue.serverTimestamp(),
-        'matchId': widget.matchId,
-        'otherUserId': widget.otherUser.id,
-        'otherUserName': widget.otherUser.name,
-        'status': 'open',
-      });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.isEnglish
-              ? 'Message reported to moderators.'
-              : 'Mesaj moderatörlere bildirildi.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppStrings.isEnglish
-                ? 'Message could not be reported: $e'
-                : 'Mesaj bildirilemedi: $e',
-          ),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
   }
 
   Widget _buildMessageInput() {
@@ -591,7 +513,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
       child: SafeArea(
         top: false,
-            child: Consumer<ThemeProvider>(
+        child: Consumer<ThemeProvider>(
           builder: (context, themeProvider, child) {
             final isDark = themeProvider.isDarkMode;
             final inputTextColor = AppColors.getInputTextColor(isDark);
@@ -599,40 +521,40 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             final inputBgColor = isDark ? AppColors.cardBackground.withValues(alpha: 0.6) : Colors.grey[200]!;
             
             return Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
                       color: inputBgColor,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: TextField(
-                      controller: _messageController,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: TextField(
+                  controller: _messageController,
                       style: AppTextStyles.bodyMedium.copyWith(color: inputTextColor),
-                      decoration: InputDecoration(
-                        hintText: AppStrings.writeMessage,
+                  decoration: InputDecoration(
+                    hintText: AppStrings.writeMessage,
                         hintStyle: AppTextStyles.bodyMedium.copyWith(color: inputHintColor),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                      maxLines: null,
-                      textCapitalization: TextCapitalization.sentences,
-                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
+                  maxLines: null,
+                  textCapitalization: TextCapitalization.sentences,
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    onPressed: _sendMessage,
-                    icon: const Icon(Icons.send, color: Colors.white),
-                    padding: const EdgeInsets.all(12),
-                  ),
-                ),
-              ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                onPressed: _sendMessage,
+                icon: const Icon(Icons.send, color: Colors.white),
+                padding: const EdgeInsets.all(12),
+              ),
+            ),
+          ],
             );
           },
         ),

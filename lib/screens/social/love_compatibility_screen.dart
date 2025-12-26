@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -244,19 +243,9 @@ class _LoveCompatibilityScreenState extends State<LoveCompatibilityScreen> {
           onAdFailedToLoad: (_) => loaded.complete(false),
         );
         bool ok = false;
-        try { 
-          ok = await loaded.future.timeout(const Duration(seconds: 2)); 
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Interstitial ad load timeout or error: $e');
-          }
-        }
+        try { ok = await loaded.future.timeout(const Duration(seconds: 2)); } catch (_) {}
         if (ok) { await _ads.showInterstitialAd(); }
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('Error showing interstitial ad: $e');
-        }
-      }
+      } catch (_) {}
 
       final text = await _ai.generateMysticReply(
         userMessage: prompt,
@@ -286,11 +275,7 @@ class _LoveCompatibilityScreenState extends State<LoveCompatibilityScreen> {
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeOutCubic,
           );
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Error scrolling to bottom: $e');
-          }
-        }
+        } catch (_) {}
       });
     } catch (e) {
       if (!mounted) return;
@@ -344,10 +329,9 @@ class _LoveCompatibilityScreenState extends State<LoveCompatibilityScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(gradient: Provider.of<ThemeProvider>(context).backgroundGradient),
+        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
         child: SafeArea(
           child: Column(
             children: [

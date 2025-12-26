@@ -10,6 +10,8 @@ import '../theme/app_theme.dart';
 import '../theme/app_typography.dart';
 import 'liquid_glass_effect/liquid_glass_lens_shader.dart';
 import 'liquid_glass_effect/shader_painter.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
 
 /// iOS 26-style Liquid Glass Navigation Bar
 /// 
@@ -70,13 +72,13 @@ class _LiquidGlassNavbarState extends State<LiquidGlassNavbar>
     
     // Movement animation controller - Slowed for premium heavy feel
     _moveController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 250),
       vsync: this,
     );
     
     // Shimmer animation - Slowed for premium heavy feel
     _shimmerController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 200),
       vsync: this,
     );
     
@@ -313,7 +315,7 @@ class _LiquidGlassNavbarState extends State<LiquidGlassNavbar>
     return Positioned(
       left: 24,
       right: 24,
-      bottom: bottomPadding + 32,
+      bottom: bottomPadding + 18,
       child: GestureDetector(
         onPanUpdate: _handlePanUpdate,
         onPanEnd: _handlePanEnd,
@@ -382,30 +384,27 @@ class _LiquidGlassNavbarState extends State<LiquidGlassNavbar>
   Widget _buildStaticBaseGlass() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: LiquidGlassLayer(
-          settings: const LiquidGlassSettings(
-            thickness: 10,
-            glassColor: Color(0x1AFFFFFF),
-            lightIntensity: 1.0,
-          ),
-          child: LiquidGlass(
-            shape: const LiquidRoundedSuperellipse(borderRadius: 24),
-            child: Container(
-              height: _navbarHeight,
-              decoration: const BoxDecoration(
-                color: Color(0x05000000), // Reduced opacity for transparency
-              ),
-            ),
+      child: LiquidGlassLayer(
+        settings: const LiquidGlassSettings(
+          thickness: 20,
+          blur: 10,
+          glassColor: Color(0x33FFFFFF),
+          lightIntensity: 1.0,
+        ),
+        child: LiquidGlass(
+          shape: const LiquidRoundedSuperellipse(borderRadius: 24),
+          child: Container(
+            height: _navbarHeight,
+            // Container color removed as glassColor handles it now
           ),
         ),
       ),
     );
   }
   
-  // Use champagne gold color for active state to match Daily Fortune
-  static const Color _activeColor = AppColors.champagneGold;
+  // Use moonlight cyan color for active state (ultra-premium design)
+  Color _getActiveColor(bool isDark) => AppColors.getNavbarActiveColor(isDark);
+  Color _getInactiveColor(bool isDark) => AppColors.getNavbarInactiveColor(isDark);
 
   Widget _buildLiquidBlobLayer() {
     final blobWidth = _blobBaseWidth * _stretchFactor;
@@ -467,6 +466,9 @@ class _LiquidGlassNavbarState extends State<LiquidGlassNavbar>
   }
   
   Widget _buildIconLayer() {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.isDarkMode;
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Row(
@@ -486,7 +488,8 @@ class _LiquidGlassNavbarState extends State<LiquidGlassNavbar>
                 });
                 widget.onTap(index);
               },
-              activeColor: _activeColor,
+              activeColor: _getActiveColor(isDark),
+              inactiveColor: _getInactiveColor(isDark),
             ),
           );
         }),
@@ -512,12 +515,14 @@ class _NavbarIconWidget extends StatefulWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final Color activeColor;
+  final Color inactiveColor;
   
   const _NavbarIconWidget({
     required this.item,
     required this.isSelected,
     required this.onTap,
     required this.activeColor,
+    required this.inactiveColor,
   });
   @override
   State<_NavbarIconWidget> createState() => _NavbarIconWidgetState();
@@ -589,7 +594,7 @@ class _NavbarIconWidgetState extends State<_NavbarIconWidget>
                 size: 22,
                 color: widget.isSelected 
                     ? widget.activeColor 
-                    : AppColors.textMuted,
+                    : widget.inactiveColor,
               ),
               const SizedBox(height: 2),
               AnimatedDefaultTextStyle(
@@ -597,7 +602,7 @@ class _NavbarIconWidgetState extends State<_NavbarIconWidget>
                 style: AppTypography.tabLabel(
                   color: widget.isSelected 
                       ? widget.activeColor 
-                      : AppColors.textMuted,
+                      : widget.inactiveColor,
                 ),
                 child: Text(widget.item.label),
               ),

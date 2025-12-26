@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
@@ -11,10 +9,10 @@ import '../../core/services/firebase_service.dart';
 import '../../core/providers/user_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../core/widgets/mystical_loading.dart';
-import '../../core/widgets/liquid_glass_widgets.dart';
 import '../../core/services/ads_service.dart';
 import '../fortune/fortune_result_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:ui'; // Added for Glassmorphism
 
 class FortunesHistoryScreen extends StatefulWidget {
   final String? selectedFilter;
@@ -26,6 +24,8 @@ class FortunesHistoryScreen extends StatefulWidget {
 
 class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
     with TickerProviderStateMixin {
+  late AnimationController _backgroundController;
+  late Animation<double> _backgroundAnimation;
   final AdsService _adsService = AdsService();
   
   String _selectedFilter = 'all';
@@ -43,6 +43,19 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
   }
 
   void _initializeAnimations() {
+    _backgroundController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    );
+    
+    _backgroundAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _backgroundController,
+      curve: Curves.easeInOut,
+    ));
+    
     _loadDreamDraws();
   }
 
@@ -57,11 +70,7 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
           });
         }
       }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error loading dream draws: $e');
-      }
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadFortunes() async {
@@ -107,93 +116,72 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
               karmaUsed: data['karmaUsed'] ?? 0,
               isPremium: data['isPremium'] ?? false,
             ));
-          } catch (e) {
-            if (kDebugMode) {
-              debugPrint('Error parsing fortune document: $e');
-            }
-          }
+          } catch (_) {}
         }
         _userFortunes = fortunes;
       }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error loading fortunes: $e');
-      }
-    }
+    } catch (_) {}
     if (mounted) setState(() => _loadingFortunes = false);
   }
 
   Widget _getFortuneTypeIcon(String type) {
+    String assetName;
     switch (type.toLowerCase()) {
       case 'tarot':
-        return Image.asset(
-          'assets/icons/tarot.png',
-          width: 36,
-          height: 36,
-          errorBuilder: (_, __, ___) => const Text('🔮', style: TextStyle(fontSize: 32)),
-        );
+        assetName = 'assets/icons/premium_tarot.png';
+        break;
       case 'coffee':
-        return Image.asset(
-          'assets/icons/coffee.png',
-          width: 36,
-          height: 36,
-          errorBuilder: (_, __, ___) => const Text('☕', style: TextStyle(fontSize: 32)),
-        );
+        assetName = 'assets/icons/premium_coffee.png';
+        break;
       case 'palm':
-        return Image.asset(
-          'assets/icons/palm.png',
-          width: 36,
-          height: 36,
-          errorBuilder: (_, __, ___) => const Text('✋', style: TextStyle(fontSize: 32)),
-        );
+        assetName = 'assets/icons/premium_palm.png';
+        break;
       case 'astrology':
-        return Image.asset(
-          'assets/icons/astrology.png',
-          width: 36,
-          height: 36,
-          errorBuilder: (_, __, ___) => const Text('⭐', style: TextStyle(fontSize: 32)),
-        );
+        assetName = 'assets/icons/premium_astrology.png';
+        break;
       case 'face':
       case 'water':
-        return Image.asset(
-          'assets/icons/face.png',
-          width: 36,
-          height: 36,
-          errorBuilder: (_, __, ___) => const Text('👤', style: TextStyle(fontSize: 32)),
-        );
+        assetName = 'assets/icons/premium_face.png';
+        break;
       case 'katina':
-        return Image.asset(
-          'assets/icons/katina.png',
-          width: 36,
-          height: 36,
-          errorBuilder: (_, __, ___) => const Text('🔮', style: TextStyle(fontSize: 32)),
-        );
+      case 'love':
+        assetName = 'assets/icons/premium_katina.png';
+        break;
       case 'dream':
-        return Image.asset(
-          'assets/icons/dream.png',
-          width: 36,
-          height: 36,
-          errorBuilder: (_, __, ___) => const Text('🌙', style: TextStyle(fontSize: 32)),
-        );
+        // Fallback or specific icon if available
+        assetName = 'assets/icons/dream.png'; 
+        break;
       default:
-        return const Text('🔮', style: TextStyle(fontSize: 32));
+        assetName = 'assets/icons/premium_tarot.png';
     }
+    
+    return Image.asset(
+      assetName,
+      width: 40,
+      height: 40,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => const Text('🔮', style: TextStyle(fontSize: 32)),
+    );
   }
 
-  Color _getFortuneTypeColor(String type, bool isDark) {
+  Color _getFortuneTypeColor(String type) {
     switch (type.toLowerCase()) {
       case 'tarot':
-        return LiquidGlassColors.liquidGlassActive(isDark);
+        return const Color(0xFF9D4EDD); // Mystic Purple
       case 'coffee':
-        return const Color(0xFFC4A477);
+        return const Color(0xFFD4A373); // Warm Coffee
       case 'palm':
-        return const Color(0xFF9B8ED0);
+        return const Color(0xFF2A9D8F); // Mystic Teal
       case 'astrology':
-        return const Color(0xFFE6D3A3);
+        return const Color(0xFF4361EE); // Cosmic Blue
       case 'dream':
-        return const Color(0xFF7C6FA8);
+        return const Color(0xFFF72585); // Vivid Pink
+      case 'katina':
+        return const Color(0xFFE63946); // Deep Rose
+      case 'face':
+        return const Color(0xFFFFB703); // Golden Amber
       default:
-        return LiquidGlassColors.liquidGlassActive(isDark);
+        return AppColors.primary;
     }
   }
 
@@ -203,15 +191,67 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
       builder: (context, themeProvider, child) {
         final isDark = themeProvider.isDarkMode;
         
+        // iOS System Background Colors
+        final backgroundColor = isDark 
+            ? const Color(0xFF0F172A) 
+            : const Color(0xFFF5F5F7); // iOS Light Gray
+            
         return Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Container(
-            decoration: BoxDecoration(
-              gradient: themeProvider.backgroundGradient,
-            ),
-            child: SafeArea(
-              child: LiquidGlassScreenWrapper(
-                duration: const Duration(milliseconds: 700),
+          backgroundColor: backgroundColor,
+          body: Stack(
+            children: [
+              // Subtle Ambient Orbs for Premium Feel
+              if (isDark) ...[
+                Positioned(
+                  top: -100,
+                  right: -100,
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+                    child: Container(
+                      width: 300,
+                      height: 300,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF4A00E0).withValues(alpha: 0.15),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: -50,
+                  left: -50,
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+                    child: Container(
+                      width: 250,
+                      height: 250,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFE91E63).withValues(alpha: 0.1),
+                      ),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                 // Light Mode Subtle Warmth
+                 Positioned(
+                  top: -100,
+                  right: -50,
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+                    child: Container(
+                      width: 300,
+                      height: 300,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF6200EA).withValues(alpha: 0.05),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+
+              SafeArea(
                 child: Column(
                   children: [
                     _buildHeader(isDark),
@@ -219,25 +259,9 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
                     Expanded(
                       child: _loadingFortunes
                           ? Center(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(30),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: Colors.white.withOpacity(0.15),
-                                      ),
-                                    ),
-                                    child: const MysticalLoading(
-                                      type: MysticalLoadingType.cards,
-                                      message: 'Fallar yükleniyor...',
-                                    ),
-                                  ),
-                                ),
+                              child: MysticalLoading(
+                                type: MysticalLoadingType.cards,
+                                message: AppStrings.isEnglish ? 'Loading...' : 'Fallar Yükleniyor...',
                               ),
                             )
                           : _buildCombinedAccordingToFilter(isDark),
@@ -245,7 +269,7 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
                   ],
                 ),
               ),
-            ),
+            ],
           ),
         );
       },
@@ -253,92 +277,35 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
   }
 
   Widget _buildHeader(bool isDark) {
-    return LiquidGlassHeader(
-      title: AppStrings.fortunesHistory,
-      trailing: Builder(
-        builder: (context) {
-          final totalCount = _userFortunes.length + _dreamDraws.length;
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      LiquidGlassColors.liquidGlassActive(isDark).withOpacity(0.4),
-                      LiquidGlassColors.liquidGlassSecondary(isDark).withOpacity(0.3),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: LiquidGlassColors.liquidGlassActive(isDark).withOpacity(0.5),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: LiquidGlassColors.liquidGlassActive(isDark).withOpacity(0.3),
-                      blurRadius: 15,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Text(
-                  '$totalCount ${AppStrings.total}',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.getTextPrimary(isDark),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildFilters(bool isDark) {
-    return Container(
-      height: 130,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Row(
         children: [
-          // Type Filter
-          SizedBox(
-            height: 55,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildLiquidGlassFilterChip('all', AppStrings.all, Icons.all_inclusive, isDark),
-                const SizedBox(width: 8),
-                _buildLiquidGlassFilterChip('tarot', AppStrings.tarot, Icons.auto_awesome, isDark),
-                const SizedBox(width: 8),
-                _buildLiquidGlassFilterChip('coffee', AppStrings.coffee, Icons.coffee, isDark),
-                const SizedBox(width: 8),
-                _buildLiquidGlassFilterChip('palm', AppStrings.palm, Icons.back_hand, isDark),
-                const SizedBox(width: 8),
-                _buildLiquidGlassFilterChip('astrology', AppStrings.astrology, Icons.star, isDark),
-                const SizedBox(width: 8),
-                _buildLiquidGlassFilterChip('dream', 'Rüya', Icons.nightlight_round, isDark),
-              ],
+          Text(
+            AppStrings.fortunesHistory,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w700, // Reduced bold for elegance
+              color: isDark ? Colors.white : const Color(0xFF1C1C1E), // iOS Black
+              letterSpacing: 0.3,
             ),
           ),
-          const SizedBox(height: 12),
-          // Sort Filter
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildLiquidGlassSortChip('newest', AppStrings.newest, Icons.schedule),
-                const SizedBox(width: 8),
-                _buildLiquidGlassSortChip('oldest', AppStrings.oldest, Icons.history),
-                const SizedBox(width: 8),
-                _buildLiquidGlassSortChip('favorites', AppStrings.favorites, Icons.favorite),
-                const SizedBox(width: 8),
-                _buildLiquidGlassSortChip('rating', AppStrings.rating, Icons.star_rate),
-              ],
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark 
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.black.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '${_userFortunes.length + _dreamDraws.length} ${AppStrings.total}',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black54,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
             ),
           ),
         ],
@@ -346,96 +313,164 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
     );
   }
 
-  Widget _buildLiquidGlassFilterChip(String value, String label, IconData icon, bool isDark) {
+  Widget _buildFilters(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Column(
+        children: [
+          // Type Filter
+          SizedBox(
+            height: 44, // Slightly smaller for elegance
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              children: [
+                _buildElegantFilterChip('all', AppStrings.all, Icons.grid_view_rounded, isDark),
+                _buildElegantFilterChip('tarot', AppStrings.tarot, Icons.auto_awesome, isDark),
+                _buildElegantFilterChip('coffee', AppStrings.coffee, Icons.coffee, isDark),
+                _buildElegantFilterChip('palm', AppStrings.palm, Icons.back_hand, isDark),
+                _buildElegantFilterChip('astrology', AppStrings.astrology, Icons.star, isDark),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Sort Filter
+          SizedBox(
+            height: 36,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              children: [
+                _buildElegantSortChip('newest', AppStrings.newest, Icons.schedule, isDark),
+                _buildElegantSortChip('favorites', AppStrings.favorites, Icons.favorite_border, isDark),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildElegantFilterChip(String value, String label, IconData icon, bool isDark) {
     final isSelected = _selectedFilter == value;
+    final activeColor = isDark ? Colors.white : const Color(0xFF1C1C1E);
+    final inactiveColor = isDark ? Colors.white54 : Colors.black54;
     
-    return LiquidGlassChip(
-      label: label,
-      icon: icon,
-      isSelected: isSelected,
-      selectedColor: _getFortuneTypeColor(value, isDark),
-      onTap: () {
-        setState(() {
-          _selectedFilter = value;
-        });
-      },
-    );
-  }
-
-  Widget _buildLiquidGlassSortChip(String value, String label, IconData icon) {
-    final isSelected = _selectedSort == value;
-    
-    return LiquidGlassChip(
-      label: label,
-      icon: icon,
-      isSelected: isSelected,
-      selectedColor: const Color(0xFF8B7BC0),
-      onTap: () {
-        setState(() {
-          _selectedSort = value;
-        });
-      },
-    );
-  }
-
-  Widget _buildEmptyState(bool isDark) {
-    return Center(
-      child: LiquidGlassCard(
-        padding: const EdgeInsets.all(40),
-        margin: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    LiquidGlassColors.liquidGlassActive(isDark).withOpacity(0.3),
-                    LiquidGlassColors.liquidGlassSecondary(isDark).withOpacity(0.2),
-                  ],
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedFilter = value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? (isDark ? Colors.white : Colors.black)
+                : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? Colors.transparent : (isDark ? Colors.white10 : Colors.black12),
+            ),
+            boxShadow: isSelected 
+                ? [
+                    BoxShadow(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    )
+                  ]
+                : [],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? (isDark ? Colors.black : Colors.white) : inactiveColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? (isDark ? Colors.black : Colors.white) : inactiveColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
-                shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.auto_awesome_outlined,
-                size: 60,
-                color: AppColors.getIconColor(isDark).withOpacity(0.8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildElegantSortChip(String value, String label, IconData icon, bool isDark) {
+    final isSelected = _selectedSort == value;
+    final inactiveColor = isDark ? Colors.white60 : Colors.black54;
+    
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedSort = value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? (isDark ? const Color(0xFF323232) : const Color(0xFFE5E5EA))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? (isDark ? Colors.white : Colors.black) : inactiveColor,
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              AppStrings.noFortunes,
-              style: AppTextStyles.headingMedium.copyWith(
-                color: AppColors.getTextPrimary(isDark),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? (isDark ? Colors.white : Colors.black) : inactiveColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              AppStrings.startFirstFortune,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.getTextSecondary(isDark),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildFortunesList(List<FortuneModel> fortunes, bool isDark) {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      itemCount: fortunes.length,
-      itemBuilder: (context, index) {
-        final fortune = fortunes[index];
-        return _buildFortuneCard(fortune, isDark, index);
-      },
+  Widget _buildEmptyState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.history_edu_rounded,
+            size: 64,
+            color: isDark ? Colors.white24 : Colors.black12,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            AppStrings.noFortunes,
+            style: TextStyle(
+              color: isDark ? Colors.white70 : Colors.black54,
+              fontSize: 16,
+              fontWeight: FontWeight.w500
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
-
+  
   Widget _buildCombinedAccordingToFilter(bool isDark) {
     List<FortuneModel> list = [];
     if (_selectedFilter == 'dream') {
@@ -450,7 +485,9 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
           .where((f) => f.type.name.toLowerCase() == _selectedFilter.toLowerCase())
           .toList();
     }
+    
     if (list.isEmpty) return _buildEmptyState(isDark);
+    
     switch (_selectedSort) {
       case 'newest':
         list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -465,7 +502,15 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
         list.sort((a, b) => b.rating.compareTo(a.rating));
         break;
     }
-    return _buildFortunesList(list, isDark);
+    
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        final fortune = list[index];
+        return _buildElegantFortuneCard(fortune, isDark);
+      },
+    );
   }
 
   FortuneModel _mapDreamDrawToFortune(Map<String, dynamic> d) {
@@ -516,18 +561,15 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
           if (!loadedCompleter.isCompleted) loadedCompleter.complete(false);
         },
       );
-
       bool isLoaded = false;
       try {
         isLoaded = await loadedCompleter.future.timeout(const Duration(seconds: 2));
       } catch (_) {
         isLoaded = false;
       }
-
       if (isLoaded) {
         await _adsService.showInterstitialAd();
       }
-      
       if (mounted) {
         Navigator.push(
           context,
@@ -548,161 +590,112 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
     }
   }
 
-  Widget _buildFortuneCard(FortuneModel fortune, bool isDark, int index) {
-    final fortuneColor = _getFortuneTypeColor(fortune.type.name, isDark);
+  Widget _buildElegantFortuneCard(FortuneModel fortune, bool isDark) {
+    final fortuneColor = _getFortuneTypeColor(fortune.type.name);
     final displayTitle = _getFortuneDisplayTitle(fortune);
     
-    return LiquidGlassCard(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      animationDelayMs: index * 80,
-      glowColor: fortuneColor,
-      onTap: () => _showAdAndNavigate(fortune),
-      child: Row(
-        children: [
-          // Icon container with glass effect
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      fortuneColor.withOpacity(0.5),
-                      fortuneColor.withOpacity(0.3),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: fortuneColor.withOpacity(0.4),
-                    width: 1,
-                  ),
-                  boxShadow: [
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: GestureDetector(
+        onTap: () => _showAdAndNavigate(fortune),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark 
+                ? Colors.white.withValues(alpha: 0.05) 
+                : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: isDark 
+                ? []
+                : [
                     BoxShadow(
-                      color: fortuneColor.withOpacity(0.35),
-                      blurRadius: 12,
-                      spreadRadius: 1,
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 15,
+                      offset: const Offset(0, 4),
                     ),
                   ],
-                ),
-                child: Center(
-                  child: _getFortuneTypeIcon(fortune.type.name),
-                ),
-              ),
+            border: Border.all(
+              color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
+              width: 1,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
+                // Icon Container
+                Container(
+                  width: 64,
+                  height: 64,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark 
+                        ? Colors.black.withValues(alpha: 0.2) 
+                        : fortuneColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: _getFortuneTypeIcon(fortune.type.name),
+                ),
+                const SizedBox(width: 16),
+                
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                         displayTitle,
-                        style: AppTextStyles.headingMedium.copyWith(
-                          color: AppColors.getTextPrimary(isDark),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.2,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    if (fortune.isFavorite)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.pink.withOpacity(0.2),
-                            shape: BoxShape.circle,
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule_rounded,
+                            color: isDark ? Colors.white54 : Colors.black45,
+                            size: 14,
                           ),
-                          child: Icon(
-                            Icons.favorite,
-                            color: Colors.pink[300],
-                            size: 16,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.schedule_outlined,
-                      color: AppColors.getTextSecondary(isDark),
-                      size: 14,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _formatDate(fortune.createdAt),
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.getTextSecondary(isDark),
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (fortune.rating > 0) ...[
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.karma.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.karma.withOpacity(0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.star,
-                              color: AppColors.karma,
-                              size: 12,
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDate(fortune.createdAt),
+                            style: TextStyle(
+                              color: isDark ? Colors.white54 : Colors.black45,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${fortune.rating}/5',
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.karma,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ],
-                  ],
+                  ),
+                ),
+                
+                // Navigation Arrow
+                if (fortune.isFavorite)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Icon(
+                      Icons.favorite,
+                      color: const Color(0xFFFF2D55), // iOS Red
+                      size: 20,
+                    ),
+                  ),
+                  
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: isDark ? Colors.white30 : Colors.black26,
+                  size: 24,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.12),
-              ),
-            ),
-            child: Icon(
-              Icons.arrow_forward_ios,
-              color: AppColors.getIconColor(isDark),
-              size: 16,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -751,6 +744,7 @@ class _FortunesHistoryScreenState extends State<FortunesHistoryScreen>
 
   @override
   void dispose() {
+    _backgroundController.dispose();
     _adsService.disposeAllAds();
     super.dispose();
   }

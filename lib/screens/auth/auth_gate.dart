@@ -134,21 +134,32 @@ class _AuthGateState extends State<AuthGate> {
               );
             }
 
-            // Kullanıcı giriş yapmışsa
+            // Kullanıcı giriş yapmışsa premium onboarding kontrolü yap
             if (snapshot.hasData && snapshot.data != null) {
-              // Premium onboarding kontrolü - her açılışta göster
               return FutureBuilder<bool>(
                 future: _shouldShowPremiumOnboarding(),
-                builder: (context, premiumSnapshot) {
-                  if (premiumSnapshot.connectionState == ConnectionState.waiting) {
-                    return const MainScreen(); // Hemen ana ekranı göster
+                builder: (context, onboardingSnapshot) {
+                  if (onboardingSnapshot.connectionState == ConnectionState.waiting) {
+                    return Scaffold(
+                      body: Container(
+                        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
+                        child: Center(
+                          child: MysticalLoading(
+                            type: MysticalLoadingType.spinner,
+                            size: 24,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    );
                   }
-                  
-                  // Premium değilse onboarding göster
-                  if (premiumSnapshot.data == true) {
+
+                  // Premium onboarding gösterilmeli mi?
+                  if (onboardingSnapshot.hasData && onboardingSnapshot.data == true) {
                     return const PremiumOnboardingScreen();
                   }
-                  
+
+                  // Ana sayfaya git
                   return const MainScreen();
                 },
               );

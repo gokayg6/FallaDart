@@ -1,8 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
-import 'package:gif/gif.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -13,11 +11,9 @@ import '../../core/providers/user_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../core/services/quiz_test_service.dart';
 import '../../core/widgets/mystical_loading.dart';
-import '../../core/widgets/liquid_glass_widgets.dart';
 import '../tests/general_test_screen.dart';
 import '../tests/test_result_screen.dart';
 import '../../core/utils/helpers.dart';
-import '../../widgets/ads/banner_ad_widget.dart';
 
 class TestsScreen extends StatefulWidget {
   const TestsScreen({Key? key}) : super(key: key);
@@ -26,15 +22,32 @@ class TestsScreen extends StatefulWidget {
   State<TestsScreen> createState() => _TestsScreenState();
 }
 
-class _TestsScreenState extends State<TestsScreen>
-    with TickerProviderStateMixin {
+class _TestsScreenState extends State<TestsScreen> with TickerProviderStateMixin {
+  late AnimationController _backgroundController;
+  late Animation<double> _backgroundAnimation;
   
   String _selectedCategory = 'available';
 
   @override
   void initState() {
     super.initState();
+    _initializeAnimations();
     _loadTests();
+  }
+
+  void _initializeAnimations() {
+    _backgroundController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    );
+    
+    _backgroundAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _backgroundController,
+      curve: Curves.easeInOut,
+    ));
   }
 
   void _loadTests() {
@@ -48,203 +61,191 @@ class _TestsScreenState extends State<TestsScreen>
     });
   }
 
-  String _getTestTypeIcon(TestType type) {
-    switch (type) {
-      case TestType.love:
-        return '❤️';
-      case TestType.personality:
-        return '🧠';
-      case TestType.compatibility:
-        return '💕';
-      case TestType.career:
-        return '💼';
-      case TestType.friendship:
-        return '👥';
-      case TestType.family:
-        return '👨‍👩‍👧‍👦';
-    }
-  }
-
-  Color _getTestTypeColor(TestType type, bool isDark) {
-    switch (type) {
-      case TestType.love:
-        return const Color(0xFFE88BC4);
-      case TestType.personality:
-        return LiquidGlassColors.liquidGlassActive(isDark);
-      case TestType.compatibility:
-        return const Color(0xFF9B8ED0);
-      case TestType.career:
-        return const Color(0xFFE6D3A3);
-      case TestType.friendship:
-        return const Color(0xFF7CC4A4);
-      case TestType.family:
-        return const Color(0xFF82B4D9);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         final isDark = themeProvider.isDarkMode;
-        
-        return Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: BoxDecoration(
-            gradient: themeProvider.backgroundGradient,
-          ),
-          child: SafeArea(
-            child: LiquidGlassScreenWrapper(
-              duration: const Duration(milliseconds: 700),
-              child: Column(
-                children: [
-                  _buildHeader(),
-                  _buildCategorySelector(isDark),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: Consumer<TestProvider>(
-                            builder: (context, testProvider, child) {
-                              if (testProvider.isLoading) {
-                                return Center(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: BackdropFilter(
-                                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(30),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(
-                                            color: Colors.white.withOpacity(0.15),
-                                          ),
-                                        ),
-                                        child: const MysticalLoading(
-                                          type: MysticalLoadingType.stars,
-                                          message: 'Testler yükleniyor...',
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
+        // iOS System Background Colors
+        final backgroundColor = isDark 
+            ? const Color(0xFF0F172A) 
+            : const Color(0xFFF5F5F7); // iOS Light Gray
 
-                              return _selectedCategory == 'available'
-                                  ? _buildAvailableTests(testProvider, isDark)
-                                  : _buildCompletedTests(testProvider, isDark);
-                            },
-                          ),
-                        ),
-                        const BannerAdWidget(
-                          margin: EdgeInsets.symmetric(vertical: 8),
-                        ),
-                      ],
+        return Scaffold(
+          backgroundColor: backgroundColor,
+          body: Stack(
+            children: [
+              // Ambient Background Particles
+              if (isDark) ...[
+                Positioned(
+                  top: -100,
+                  right: -100,
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+                    child: Container(
+                      width: 300,
+                      height: 300,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF4A00E0).withValues(alpha: 0.15),
+                      ),
                     ),
                   ),
-                ],
+                ),
+                Positioned(
+                  bottom: -50,
+                  left: -50,
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+                    child: Container(
+                      width: 250,
+                      height: 250,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFE91E63).withValues(alpha: 0.1),
+                      ),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                 // Light Mode Subtle Warmth
+                 Positioned(
+                  top: -100,
+                  right: -50,
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+                    child: Container(
+                      width: 300,
+                      height: 300,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF6200EA).withValues(alpha: 0.05),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+
+              SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(isDark),
+                    _buildElegantCategorySelector(isDark),
+                    Expanded(
+                      child: Consumer<TestProvider>(
+                        builder: (context, testProvider, child) {
+                          if (testProvider.isLoading) {
+                            return Center(
+                              child: MysticalLoading(
+                                type: MysticalLoadingType.stars,
+                                message: AppStrings.isEnglish ? 'Loading tests...' : 'Testler yükleniyor...',
+                              ),
+                            );
+                          }
+
+                          return _selectedCategory == 'available'
+                                  ? _buildAvailableTests(testProvider, isDark)
+                                  : _buildCompletedTests(testProvider, isDark);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildHeader() {
-    return LiquidGlassHeader(
-      title: AppStrings.tests,
-    );
-  }
-
-  Widget _buildCategorySelector(bool isDark) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildLiquidGlassCategoryButton(
-              'available',
-              AppStrings.all,
-              isDark,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildLiquidGlassCategoryButton(
-              'completed',
-              AppStrings.completedTests,
-              isDark,
-            ),
-          ),
-        ],
+  Widget _buildHeader(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Text(
+        AppStrings.tests,
+        style: TextStyle(
+          fontSize: 34,
+          fontWeight: FontWeight.w700,
+          color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }
 
-  Widget _buildLiquidGlassCategoryButton(String value, String label, bool isDark) {
-    final isSelected = _selectedCategory == value;
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedCategory = value;
-        });
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-            decoration: BoxDecoration(
-              gradient: isSelected
-                  ? LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        LiquidGlassColors.liquidGlassActive(isDark).withOpacity(0.5),
-                        LiquidGlassColors.liquidGlassSecondary(isDark).withOpacity(0.4),
-                      ],
-                    )
-                  : LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        isDark ? Colors.white.withOpacity(0.12) : AppColors.premiumLightSurface,
-                        isDark ? Colors.white.withOpacity(0.05) : AppColors.premiumLightSurface.withOpacity(0.8),
-                      ],
-                    ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isSelected
-                    ? LiquidGlassColors.liquidGlassActive(isDark).withOpacity(0.5)
-                    : (isDark ? Colors.white.withOpacity(0.15) : AppColors.premiumLightTextSecondary.withOpacity(0.2)),
-                width: isSelected ? 1.5 : 1,
-              ),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: LiquidGlassColors.liquidGlassActive(isDark).withOpacity(0.3),
-                        blurRadius: 15,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: isSelected ? Colors.white : (isDark ? Colors.white : AppColors.getTextPrimary(false).withOpacity(0.7)),
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+  Widget _buildElegantCategorySelector(bool isDark) {
+    return Container(
+      height: 44,
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE5E5EA),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Stack(
+        children: [
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutBack,
+            alignment: _selectedCategory == 'available' ? Alignment.centerLeft : Alignment.centerRight,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.5 - 24, // Approx half width minus padding
+              margin: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF334155) : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
             ),
           ),
-        ),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedCategory = 'available'),
+                  behavior: HitTestBehavior.translucent,
+                  child: Center(
+                    child: Text(
+                      AppStrings.all,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _selectedCategory == 'available' 
+                            ? (isDark ? Colors.white : Colors.black) 
+                            : (isDark ? Colors.white54 : Colors.black54),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedCategory = 'completed'),
+                  behavior: HitTestBehavior.translucent,
+                  child: Center(
+                    child: Text(
+                      AppStrings.completedTests,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _selectedCategory == 'completed' 
+                            ? (isDark ? Colors.white : Colors.black) 
+                            : (isDark ? Colors.white54 : Colors.black54),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -253,326 +254,246 @@ class _TestsScreenState extends State<TestsScreen>
     final quizTestService = QuizTestService();
     final allTests = quizTestService.getAllTests();
     
+    // Popüler testler
     final popularTestIds = ['personality', 'friendship', 'love', 'compatibility', 'love_what_you_want'];
     final popularTests = allTests.where((test) => 
       popularTestIds.contains(test.id)
     ).toList();
     
+    // Diğer testler
     final otherTests = allTests.where((test) => 
       !popularTestIds.contains(test.id)
     ).toList();
     
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (popularTests.isNotEmpty) ...[
-            _buildSectionHeader(AppStrings.popularTests, 0, isDark),
+            Text(
+              AppStrings.popularTests,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+              ),
+            ),
             const SizedBox(height: 16),
-            _buildPopularTestsList(popularTests, isDark),
+            ...popularTests.map((test) => _buildGlassTestCard(test, isDark)).toList(),
             const SizedBox(height: 32),
           ],
           if (otherTests.isNotEmpty) ...[
-            _buildSectionHeader(AppStrings.otherTests, 200, isDark),
+            Text(
+              AppStrings.otherTests,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+              ),
+            ),
             const SizedBox(height: 16),
-            _buildOtherTestsList(otherTests, isDark),
+            ...otherTests.map((test) => _buildGlassTestCard(test, isDark)).toList(),
           ],
         ],
       ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title, int delayMs, bool isDark) {
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 500),
-      tween: Tween(begin: 0.0, end: 1.0),
-      curve: Curves.easeOut,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(-20 * (1 - value), 0),
-            child: ShaderMask(
-              shaderCallback: (bounds) => LinearGradient(
-                colors: [
-                  AppColors.getTextPrimary(isDark),
-                  LiquidGlassColors.shimmerColor(isDark),
-                ],
-              ).createShader(bounds),
-              child: Text(
-                title,
-                style: AppTextStyles.headingLarge.copyWith(
-                  color: AppColors.getTextPrimary(isDark),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPopularTestsList(List<QuizTestDefinition> tests, bool isDark) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: tests.length,
-      itemBuilder: (context, index) {
-        final test = tests[index];
-        return _buildPopularTestCard(test, isDark, index);
-      },
-    );
-  }
-
-  Widget _buildOtherTestsList(List<QuizTestDefinition> tests, bool isDark) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: tests.length,
-      itemBuilder: (context, index) {
-        final test = tests[index];
-        return _buildOtherTestCard(test, isDark, index);
-      },
     );
   }
 
   String? _getTestGifPath(QuizTestDefinition test) {
     switch (test.id) {
       case 'personality':
-        return 'assets/gif/populer_testler/kisilik_testi/kisilik_testi.gif';
+      return 'assets/gif/Popüler Testler/Kişilik Testi/kişiliktesti.gif';
       case 'friendship':
-        return 'assets/gif/populer_testler/arkadaslik_testi/arkadaslik_testi.gif';
+      return 'assets/gif/Popüler Testler/Arkadaşlık Testi/arkadaşlıktesti.gif';
       case 'love':
-        return 'assets/gif/populer_testler/ask_testi/ask_testi.gif';
+      return 'assets/gif/Popüler Testler/Aşk Testi/aşktesti.gif';
       case 'compatibility':
-        return 'assets/gif/populer_testler/iliski_uyum_testi/iliski_uyum_testi.gif';
+      return 'assets/gif/Popüler Testler/İlişki Uyum Testi/ilişkiuyumtesti.gif';
       case 'love_what_you_want':
-        return 'assets/gif/populer_testler/iliskinde_gercekten_ne_istiyorsun/iliskinde_gercekten_ne_istiyorsun.gif';
+      return 'assets/gif/Popüler Testler/İlişkinde Gerçekten Ne İstiyorsun/ilişkindegerçektenneistiyorsun.gif';
       default:
-        return null;
+      return null;
     }
+  }
+
+  Color _getTestColor(String testId) {
+    if (testId.contains('love') || testId.contains('aşk')) return const Color(0xFFE91E63); // Pink
+    if (testId.contains('personality') || testId.contains('kişilik')) return const Color(0xFF9C27B0); // Purple
+    if (testId.contains('friend') || testId.contains('arkadaş')) return const Color(0xFFFF9800); // Orange
+    if (testId.contains('compatibility') || testId.contains('uyum')) return const Color(0xFFF06292); // Light Pink
+    return const Color(0xFF2196F3); // Blue default
   }
 
   String _getLocalizedQuizTitle(QuizTestDefinition test) {
     if (!AppStrings.isEnglish) return test.title;
     final lower = test.title.toLowerCase();
-    if (lower.contains('kişilik testi')) {
-      return AppStrings.personalityTest;
-    } else if (lower.contains('arkadaşlık testi')) {
-      return AppStrings.friendshipTest;
-    } else if (lower.contains('aşk testi')) {
-      return AppStrings.loveTest;
-    } else if (lower.contains('ilişkinde gerçekten ne istiyorsun')) {
-      return AppStrings.relationshipWhatYouWantTest;
-    } else if (lower.contains('aşkta kırmızı bayrakları görebiliyor musun')) {
-      return AppStrings.loveRedFlagsTest;
-    } else if (lower.contains('burcuna göre ne kadar eğlencelisin')) {
-      return AppStrings.zodiacFunLevelTest;
-    } else if (lower.contains('burcuna göre ne kadar kaotiksin')) {
-      return AppStrings.zodiacChaosLevelTest;
-    }
+    if (lower.contains('kişilik testi')) return AppStrings.personalityTest;
+    if (lower.contains('arkadaşlık testi')) return AppStrings.friendshipTest;
+    if (lower.contains('aşk testi')) return AppStrings.loveTest;
+    if (lower.contains('ilişkinde gerçekten ne istiyorsun')) return AppStrings.relationshipWhatYouWantTest;
+    if (lower.contains('aşkta kırmızı bayrakları görebiliyor musun')) return AppStrings.loveRedFlagsTest;
+    if (lower.contains('burcuna göre ne kadar eğlencelisin')) return AppStrings.zodiacFunLevelTest;
+    if (lower.contains('burcuna göre ne kadar kaotiksin')) return AppStrings.zodiacChaosLevelTest;
     return test.title;
   }
 
   String _getLocalizedQuizSubtitle(QuizTestDefinition test) {
     if (!AppStrings.isEnglish) return test.description;
     switch (test.id) {
-      case 'personality':
-        return AppStrings.personalityTestSubtitle;
-      case 'friendship':
-        return AppStrings.friendshipTestSubtitle;
-      case 'love':
-        return AppStrings.loveTestSubtitle;
-      case 'compatibility':
-        return AppStrings.relationshipCompatibilitySubtitle;
-      case 'love_what_you_want':
-        return AppStrings.relationshipWhatYouWantSubtitle;
-      default:
-        return test.description;
+      case 'personality': return AppStrings.personalityTestSubtitle;
+      case 'friendship': return AppStrings.friendshipTestSubtitle;
+      case 'love': return AppStrings.loveTestSubtitle;
+      case 'compatibility': return AppStrings.relationshipCompatibilitySubtitle;
+      case 'love_what_you_want': return AppStrings.relationshipWhatYouWantSubtitle;
+      default: return test.description;
     }
   }
 
-  Color _getTestColor(String testId, bool isDark) {
-    switch (testId) {
-      case 'personality':
-        return LiquidGlassColors.liquidGlassActive(isDark);
-      case 'friendship':
-        return const Color(0xFF7CC4A4);
-      case 'love':
-        return const Color(0xFFE88BC4);
-      case 'compatibility':
-        return const Color(0xFF9B8ED0);
-      case 'love_what_you_want':
-        return const Color(0xFFE6D3A3);
-      default:
-        return LiquidGlassColors.liquidGlassActive(isDark);
-    }
-  }
-
-  Widget _buildPopularTestCard(QuizTestDefinition test, bool isDark, int index) {
+  Widget _buildGlassTestCard(QuizTestDefinition test, bool isDark) {
     final gifPath = _getTestGifPath(test);
-    final testColor = _getTestColor(test.id, isDark);
+    final baseColor = _getTestColor(test.id);
     
-    return LiquidGlassCard(
-      margin: const EdgeInsets.only(bottom: 16),
-      animationDelayMs: index * 80,
-      glowColor: testColor,
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => GeneralTestScreen(testDefinition: test),
-          ),
-        );
-      },
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _getLocalizedQuizTitle(test),
-                  style: AppTextStyles.headingSmall.copyWith(
-                    color: AppColors.getTextPrimary(isDark),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _getLocalizedQuizSubtitle(test),
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.getTextSecondary(isDark),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => GeneralTestScreen(testDefinition: test),
+            ),
+          );
+        },
+        child: Container(
+          height: 110,
+          decoration: BoxDecoration(
+            color: isDark 
+                ? Colors.white.withValues(alpha: 0.05) 
+                : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: isDark 
+                ? []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 15,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+            border: Border.all(
+              color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
+              width: 1,
             ),
           ),
-          if (gifPath != null) ...[
-            const SizedBox(width: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        testColor.withOpacity(0.3),
-                        testColor.withOpacity(0.15),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: testColor.withOpacity(0.4),
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(13),
-                    child: Gif(
-                      image: AssetImage(gifPath),
-                      autostart: Autostart.loop,
-                      fit: BoxFit.cover,
-                      width: 80,
-                      height: 80,
-                      placeholder: (context) => Center(
-                        child: Text(
-                          test.emoji,
-                          style: const TextStyle(fontSize: 32),
-                        ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              children: [
+                // Subtle Gradient Background
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isDark
+                            ? [baseColor.withValues(alpha: 0.1), Colors.transparent]
+                            : [baseColor.withValues(alpha: 0.05), Colors.white],
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOtherTestCard(QuizTestDefinition test, bool isDark, int index) {
-    return LiquidGlassCard(
-      margin: const EdgeInsets.only(bottom: 16),
-      animationDelayMs: 200 + (index * 60),
-      blurAmount: 20,
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => GeneralTestScreen(testDefinition: test),
-          ),
-        );
-      },
-      child: Row(
-        children: [
-          // Emoji icon
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      LiquidGlassColors.liquidGlassActive(isDark).withOpacity(0.3),
-                      LiquidGlassColors.liquidGlassSecondary(isDark).withOpacity(0.2),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark ? Colors.white.withOpacity(0.15) : AppColors.premiumLightTextSecondary.withOpacity(0.2),
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    test.emoji,
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  test.title,
-                  style: AppTextStyles.headingSmall.copyWith(
-                    color: AppColors.getTextPrimary(isDark),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  test.description,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.getTextSecondary(isDark),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                
+                Row(
+                  children: [
+                     // GIF/Image Section
+                     if (gifPath != null)
+                      Container(
+                        width: 100,
+                        height: double.infinity,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            right: BorderSide(
+                              color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                            )
+                          )
+                        ),
+                        child: Image.asset(
+                          gifPath,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Text(test.emoji, style: const TextStyle(fontSize: 32)),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        width: 100,
+                        height: double.infinity,
+                         decoration: BoxDecoration(
+                          color: baseColor.withValues(alpha: 0.1),
+                          border: Border(
+                            right: BorderSide(
+                              color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                            )
+                          )
+                        ),
+                        child: Center(
+                          child: Text(test.emoji, style: const TextStyle(fontSize: 40)),
+                        ),
+                      ),
+                      
+                    // Content Section
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _getLocalizedQuizTitle(test),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                                height: 1.2,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _getLocalizedQuizSubtitle(test),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.normal,
+                                color: isDark ? Colors.white60 : Colors.black54,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    // Arrow
+                    Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        color: isDark ? Colors.white30 : Colors.black26,
+                        size: 24,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          Icon(
-            Icons.chevron_right,
-            color: AppColors.getTextSecondary(isDark),
-            size: 20,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -588,57 +509,66 @@ class _TestsScreenState extends State<TestsScreen>
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 16),
           if (quizTestResults.isNotEmpty) ...[
-            _buildSectionHeader(AppStrings.testResults, 0, isDark),
+            Text(
+              AppStrings.testResults,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+              ),
+            ),
             const SizedBox(height: 16),
-            _buildQuizTestResultsList(quizTestResults, isDark),
-            if (completedTests.isNotEmpty) const SizedBox(height: 24),
+            ...quizTestResults.map((result) => _buildGlassResultCard(result, isDark)).toList(),
+            const SizedBox(height: 32),
           ],
           if (completedTests.isNotEmpty) ...[
-            if (quizTestResults.isNotEmpty)
-              _buildSectionHeader(AppStrings.otherTests, 100, isDark),
-            if (quizTestResults.isEmpty) const SizedBox(height: 16),
-            _buildTestsList(completedTests, isDark),
+             Text(
+              AppStrings.otherTests,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...completedTests.map((test) => _buildGlassLegacyResultCard(test, isDark)).toList(),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildTestsList(List<TestModel> tests, bool isDark) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: tests.length,
-      itemBuilder: (context, index) {
-        final test = tests[index];
-        return _buildTestCard(test, isDark, index);
-      },
+  Widget _buildEmptyCompletedState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.checklist_rtl_rounded,
+            size: 64,
+            color: isDark ? Colors.white12 : Colors.black12,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            AppStrings.noCompletedTests,
+            style: TextStyle(
+              color: isDark ? Colors.white54 : Colors.black45,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildQuizTestResultsList(List<QuizTestResult> results, bool isDark) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: results.length,
-      itemBuilder: (context, index) {
-        final result = results[index];
-        return _buildQuizTestResultCard(result, isDark, index);
-      },
-    );
-  }
-
-  Widget _buildQuizTestResultCard(QuizTestResult result, bool isDark, int index) {
-    return LiquidGlassCard(
-      margin: const EdgeInsets.only(bottom: 16),
-      animationDelayMs: index * 80,
-      glowColor: AppColors.success,
+  Widget _buildGlassResultCard(QuizTestResult result, bool isDark) {
+    return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -646,347 +576,87 @@ class _TestsScreenState extends State<TestsScreen>
           ),
         );
       },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          LiquidGlassColors.liquidGlassActive(isDark).withOpacity(0.3),
-                          LiquidGlassColors.liquidGlassSecondary(isDark).withOpacity(0.2),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.15),
-                      ),
-                    ),
-                    child: Text(
-                      result.emoji,
-                      style: const TextStyle(fontSize: 24),
-                    ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark 
+              ? Colors.white.withValues(alpha: 0.05) 
+              : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: isDark 
+              ? []
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 15,
+                    offset: const Offset(0, 4),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      result.testTitle,
-                      style: AppTextStyles.headingSmall.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatDate(result.createdAt),
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: Colors.white.withOpacity(0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.success.withOpacity(0.4),
-                          AppColors.success.withOpacity(0.25),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.success.withOpacity(0.5),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.check_circle, color: AppColors.success, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          AppStrings.testCompleted,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.success,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.08),
-                  ),
-                ),
-                child: Text(
-                  () {
-                    final cleaned = Helpers.cleanMarkdown(result.resultText);
-                    return cleaned.length > 150
-                        ? '${cleaned.substring(0, 150)}...'
-                        : cleaned;
-                  }(),
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: Colors.white.withOpacity(0.7),
-                    height: 1.4,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      return 'Bugün';
-    } else if (difference.inDays == 1) {
-      return 'Dün';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} gün önce';
-    } else if (difference.inDays < 30) {
-      final weeks = (difference.inDays / 7).floor();
-      return '$weeks hafta önce';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  }
-
-  Widget _buildTestCard(TestModel test, bool isDark, int index) {
-    final testColor = _getTestTypeColor(test.type, isDark);
-    
-    return LiquidGlassCard(
-      margin: const EdgeInsets.only(bottom: 16),
-      animationDelayMs: index * 80,
-      glowColor: testColor,
-      onTap: () {
-        final testProvider = Provider.of<TestProvider>(context, listen: false);
-        if (test.status == TestStatus.completed) {
-          try {
-            final result = testProvider.quizTestResults.firstWhere(
-              (r) => r.testId == test.id || r.testTitle == test.title,
-            );
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TestResultScreen(result: result),
-              ),
-            );
-          } catch (e) {
-            if (kDebugMode) {
-              debugPrint('Test result not found for test ${test.id}: $e');
-            }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(AppStrings.isEnglish ? 'Test result not found' : 'Test sonucu bulunamadı'),
-              ),
-            );
-          }
-        } else {
-          testProvider.setCurrentTest(test);
-          final quizTestService = QuizTestService();
-          final quizTest = quizTestService.getTestById(_getQuizTestIdFromTest(test));
-          if (quizTest != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => GeneralTestScreen(testDefinition: quizTest),
-              ),
-            );
-          }
-        }
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          testColor.withOpacity(0.4),
-                          testColor.withOpacity(0.25),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: testColor.withOpacity(0.4),
-                      ),
-                    ),
-                    child: Text(
-                      _getTestTypeIcon(test.type),
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      test.title,
-                      style: AppTextStyles.headingSmall.copyWith(
-                        color: Colors.white,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      test.getDisplayName(),
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: testColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                children: [
-                  if (test.isFavorite)
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.pink.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.favorite,
-                        color: Colors.pink[300],
-                        size: 16,
-                      ),
-                    ),
-                  if (test.status == TestStatus.completed) ...[
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.check_circle,
-                        color: AppColors.success,
-                        size: 16,
-                      ),
-                    ),
-                  ],
                 ],
-              ),
-            ],
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
+            width: 1,
           ),
-          const SizedBox(height: 14),
-          Text(
-            test.description,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: Colors.white.withOpacity(0.7),
-              height: 1.4,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Icon(
-                Icons.quiz,
-                color: Colors.white.withOpacity(0.5),
-                size: 14,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '${test.questions.length} ${AppStrings.questions}',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: Colors.white.withOpacity(0.6),
-                ),
-              ),
-              const Spacer(),
-              if (test.status == TestStatus.completed) ...[
-                Icon(
-                  Icons.score,
-                  color: Colors.white.withOpacity(0.5),
-                  size: 14,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${test.score}%',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: Colors.white.withOpacity(0.6),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    result.emoji,
+                    style: const TextStyle(fontSize: 24),
                   ),
                 ),
-              ] else if (test.karmaReward > 0) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        result.testTitle,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatDate(result.createdAt),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.white54 : Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: AppColors.karma.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: AppColors.karma.withOpacity(0.3),
-                    ),
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.auto_awesome,
-                        color: AppColors.karma,
-                        size: 12,
-                      ),
+                      const Icon(Icons.check_circle, color: Colors.green, size: 14),
                       const SizedBox(width: 4),
                       Text(
-                        '+${test.karmaReward}',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.karma,
-                          fontWeight: FontWeight.w600,
+                        AppStrings.testCompleted,
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
                           fontSize: 11,
                         ),
                       ),
@@ -994,68 +664,24 @@ class _TestsScreenState extends State<TestsScreen>
                   ),
                 ),
               ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getQuizTestIdFromTest(TestModel test) {
-    switch (test.type) {
-      case TestType.personality:
-        return 'personality';
-      case TestType.love:
-        return 'love';
-      case TestType.friendship:
-        return 'friendship';
-      case TestType.compatibility:
-        return 'compatibility';
-      default:
-        return 'personality';
-    }
-  }
-
-  Widget _buildEmptyCompletedState(bool isDark) {
-    return Center(
-      child: LiquidGlassCard(
-        padding: const EdgeInsets.all(40),
-        margin: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    LiquidGlassColors.liquidGlassActive(isDark).withOpacity(0.3),
-                    LiquidGlassColors.liquidGlassSecondary(isDark).withOpacity(0.2),
-                  ],
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.check_circle_outline,
-                size: 60,
-                color: Colors.white.withOpacity(0.8),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              AppStrings.noCompletedTests,
-              style: AppTextStyles.headingMedium.copyWith(
-                color: Colors.white,
-              ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            Text(
-              AppStrings.completeFirstTest,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: Colors.white.withOpacity(0.7),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
               ),
-              textAlign: TextAlign.center,
+              child: Text(
+                _cleanText(result.resultText),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                  height: 1.4,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -1063,8 +689,22 @@ class _TestsScreenState extends State<TestsScreen>
     );
   }
 
-  @override
-  void dispose() {
-    super.dispose();
+  Widget _buildGlassLegacyResultCard(TestModel test, bool isDark) {
+    // Legacy support for old test format if needed
+    return Container(); 
+  }
+
+  String _cleanText(String text) {
+    final cleaned = Helpers.cleanMarkdown(text);
+    return cleaned.length > 150 ? '${cleaned.substring(0, 150)}...' : cleaned;
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    if (difference.inDays == 0) return 'Bugün';
+    if (difference.inDays == 1) return 'Dün';
+    if (difference.inDays < 7) return '${difference.inDays} gün önce';
+    return '${date.day}/${date.month}/${date.year}';
   }
 }

@@ -169,12 +169,9 @@ class _PremiumOnboardingScreenState extends State<PremiumOnboardingScreen>
 
   void _handlePurchaseError(PurchaseDetails purchaseDetails) {
     if (mounted) {
-      final errorMessage = AppStrings.getPurchaseErrorMessage(
-        purchaseDetails.error?.message ?? purchaseDetails.error?.code,
-      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(errorMessage),
+          content: Text('${AppStrings.purchaseError} ${purchaseDetails.error?.message ?? AppStrings.purchaseErrorUnknown}'),
           backgroundColor: AppColors.error,
         ),
       );

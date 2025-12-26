@@ -464,6 +464,6 @@ class ThemeProvider extends ChangeNotifier {
   LinearGradient get backgroundGradient {
     if (_isMysticalMode) return AppColors.backgroundGradient;
     if (_themeMode == ThemeMode.dark) return AppColors.backgroundGradient;
-    return AppColors.lightBackgroundGradient;
+    return AppColors.pearlBackgroundGradient; // Ultra-premium pearl glass
   }
 }

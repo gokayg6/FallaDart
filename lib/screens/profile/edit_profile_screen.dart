@@ -6,7 +6,6 @@ import '../../core/constants/app_strings.dart';
 import '../../core/providers/user_provider.dart';
 import '../../core/widgets/mystical_button.dart';
 import '../../providers/theme_provider.dart';
-import '../other/aura_update_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -147,19 +146,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(AppStrings.editProfile, style: const TextStyle(color: Colors.white)),
+        title: Text(AppStrings.editProfile, style: TextStyle(color: AppColors.getTextPrimary(isDark))),
         backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.getTextPrimary(isDark),
         elevation: 0,
         centerTitle: true,
       ),
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(gradient: Provider.of<ThemeProvider>(context).backgroundGradient),
+        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -167,57 +169,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 20),
-                // Avatar with purple glow
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Outer glow
-                    Container(
-                      width: 130,
-                      height: 130,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            AppColors.mysticPurpleAccent.withOpacity(0.3),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
+                // Avatar / Profile Icon Placeholder
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [AppColors.primary, AppColors.secondary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    // Main avatar
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.mysticPurpleAccent,
-                            AppColors.mysticMagenta,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.mysticPurpleAccent.withOpacity(0.4),
-                            blurRadius: 25,
-                            spreadRadius: 5,
-                          ),
-                        ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.5),
+                        blurRadius: 20,
+                        spreadRadius: 5,
                       ),
-                      child: const Icon(
-                        Icons.person,
-                        size: 50,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.person,
+                    size: 50,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(height: 40),
                 
@@ -255,8 +230,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: 24),
                 
-                // Aura Color Input (Clickable - Navigate to Aura Analysis)
-                _buildAuraColorField(),
+                // Aura Color Input (Read Only)
+                _buildInputGroup(
+                  label: AppStrings.auraColorLabel,
+                  controller: _auraCtrl,
+                  hint: AppStrings.auraColorLabel,
+                  icon: Icons.auto_fix_high,
+                  readOnly: true,
+                  helperText: AppStrings.auraColorHint,
+                ),
                 
                 const SizedBox(height: 60),
                 
@@ -477,7 +459,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ],
               ),
               child: DropdownButtonFormField<String>(
-                value: validZodiac,
+                initialValue: validZodiac,
                 isExpanded: true,
                 style: AppTextStyles.bodyLarge.copyWith(color: inputTextColor),
                 dropdownColor: dropdownBg,
@@ -560,7 +542,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ],
               ),
               child: DropdownButtonFormField<String>(
-                value: _selectedGender,
+                initialValue: _selectedGender,
                 style: AppTextStyles.bodyLarge.copyWith(color: inputTextColor),
                 dropdownColor: dropdownBg,
                 decoration: InputDecoration(
@@ -636,7 +618,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ],
               ),
               child: DropdownButtonFormField<String>(
-                value: _selectedJob,
+                initialValue: _selectedJob,
                 style: AppTextStyles.bodyLarge.copyWith(color: inputTextColor),
                 dropdownColor: dropdownBg,
                 decoration: InputDecoration(
@@ -667,145 +649,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   });
                 },
               ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildAuraColorField() {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, child) {
-        final isDark = themeProvider.isDarkMode;
-        final inputTextColor = AppColors.getInputTextColor(isDark);
-        final inputHintColor = AppColors.getInputHintColor(isDark);
-        final inputBgColor = AppColors.getInputBackground(isDark);
-        final labelColor = AppColors.getTextSecondary(isDark);
-        
-        final helperText = AppStrings.isEnglish
-            ? 'Tap to determine your aura color through aura analysis'
-            : 'Aura renginizi belirlemek için aura analizi sayfasına gidin';
-        
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              AppStrings.auraColorLabel,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: labelColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () async {
-                // Navigate to aura analysis screen
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AuraUpdateScreen(),
-                  ),
-                );
-                
-                // Refresh aura color if user completed the analysis
-                if (mounted && result == true) {
-                  // Reload user profile to get updated aura color
-                  final userProvider = Provider.of<UserProvider>(context, listen: false);
-                  await userProvider.initialize();
-                  
-                  final user = userProvider.user;
-                  setState(() {
-                    _auraCtrl.text = user?.preferences['auraColor']?.toString() ?? 
-                        (AppStrings.isEnglish ? 'Not determined' : 'Belirlenmedi');
-                  });
-                }
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: inputBgColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.primary.withOpacity(0.3),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 20),
-                      child: Icon(
-                        Icons.auto_fix_high,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _auraCtrl.text.isEmpty || _auraCtrl.text == 'Belirlenmedi'
-                                  ? (AppStrings.isEnglish ? 'Not determined' : 'Belirlenmedi')
-                                  : _auraCtrl.text,
-                              style: AppTextStyles.bodyLarge.copyWith(
-                                color: _auraCtrl.text.isEmpty || _auraCtrl.text == 'Belirlenmedi'
-                                    ? inputHintColor
-                                    : inputTextColor,
-                                fontWeight: _auraCtrl.text.isEmpty || _auraCtrl.text == 'Belirlenmedi'
-                                    ? FontWeight.normal
-                                    : FontWeight.w600,
-                              ),
-                            ),
-                            if (_auraCtrl.text.isEmpty || _auraCtrl.text == 'Belirlenmedi')
-                              const SizedBox(height: 4),
-                            if (_auraCtrl.text.isEmpty || _auraCtrl.text == 'Belirlenmedi')
-                              Text(
-                                helperText,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.primary.withOpacity(0.8),
-                                  fontSize: 12,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 16),
-                      child: Icon(
-                        Icons.arrow_forward_ios,
-                        size: 16,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Icon(Icons.info_outline, size: 14, color: inputHintColor),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    helperText,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: inputHintColor,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         );

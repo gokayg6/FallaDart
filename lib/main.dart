@@ -195,6 +195,12 @@ class FallaApp extends StatelessWidget {
             supportedLocales: const [
               Locale('tr', 'TR'),
               Locale('en', 'US'),
+              Locale('it', 'IT'),
+              Locale('fr', 'FR'),
+              Locale('ru', 'RU'),
+              Locale('de', 'DE'),
+              Locale('ar', 'SA'),
+              Locale('fa', 'IR'),
             ],
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,

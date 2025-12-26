@@ -19,7 +19,7 @@ class GlassCard extends StatelessWidget {
   const GlassCard({
     Key? key,
     required this.child,
-    this.borderRadius = 22,
+    this.borderRadius = 24,
     this.padding = const EdgeInsets.all(20),
     this.isSelected = false,
     this.isHero = false,
@@ -28,50 +28,105 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutQuart,
-        child: RepaintBoundary(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(borderRadius),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(
-                sigmaX: isHero ? 45 : (isSelected ? 40 : 35),
-                sigmaY: isHero ? 45 : (isSelected ? 40 : 35),
-              ),
-              child: Consumer<ThemeProvider>(
-                builder: (context, themeProvider, child) {
-                  return Container(
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        final isDark = themeProvider.isDarkMode;
+        
+        return GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutQuart,
+            child: RepaintBoundary(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(borderRadius),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: isDark ? (isHero ? 45 : (isSelected ? 40 : 35)) : (isHero ? 20 : 15),
+                    sigmaY: isDark ? (isHero ? 45 : (isSelected ? 40 : 35)) : (isHero ? 20 : 15),
+                  ),
+                  child: Container(
                     padding: padding,
-                    decoration: _getDecoration(themeProvider.isDarkMode),
+                    decoration: _getDecoration(isDark),
                     child: child,
-                  );
-                },
-                child: child,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   BoxDecoration _getDecoration(bool isDark) {
     if (isHero) {
-      return AppColors.premiumHeroCardDecoration; // Consider making this theme aware too if needed
+      return isDark 
+          ? AppColors.premiumHeroCardDecoration
+          : _getLightHeroDecoration();
     } else if (isSelected) {
-      return AppColors.premiumSelectedCardDecoration;
+      return isDark
+          ? AppColors.premiumSelectedCardDecoration
+          : _getLightSelectedDecoration();
     } else {
       return isDark 
-          ? AppColors.premiumGlassCardDecoration 
-          : BoxDecoration(
-              color: AppColors.premiumLightSurface,
-              borderRadius: BorderRadius.circular(borderRadius),
-              border: Border.all(color: AppColors.premiumLightTextSecondary.withValues(alpha: 0.2)),
-            );
+          ? AppColors.darkGlassCardDecoration
+          : AppColors.pearlGlassCardDecoration;
     }
+  }
+  
+  BoxDecoration _getLightHeroDecoration() {
+    return BoxDecoration(
+      color: Colors.white.withOpacity(0.92),
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Colors.white.withOpacity(0.98),
+          AppColors.pearlGlassSemi,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(borderRadius),
+      border: Border.all(
+        color: AppColors.aquaIndigo.withOpacity(0.25),
+        width: 2,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.aquaIndigo.withOpacity(0.12),
+          blurRadius: 30,
+          offset: const Offset(0, 10),
+        ),
+        BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 20,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    );
+  }
+  
+  BoxDecoration _getLightSelectedDecoration() {
+    return BoxDecoration(
+      color: Colors.white.withOpacity(0.95),
+      borderRadius: BorderRadius.circular(borderRadius),
+      border: Border.all(
+        color: AppColors.moonlightCyan.withOpacity(0.50),
+        width: 2,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.moonlightCyan.withOpacity(0.18),
+          blurRadius: 20,
+          spreadRadius: 0,
+        ),
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    );
   }
 }
 
@@ -82,6 +137,7 @@ class GlassButton extends StatefulWidget {
   final IconData? icon;
   final double height;
   final double? width;
+  final bool useMoonlight; // Use moonlight cyan instead of gold
 
   const GlassButton({
     Key? key,
@@ -91,88 +147,139 @@ class GlassButton extends StatefulWidget {
     this.icon,
     this.height = 54,
     this.width,
+    this.useMoonlight = false,
   }) : super(key: key);
 
   @override
   State<GlassButton> createState() => _GlassButtonState();
 }
 
-class _GlassButtonState extends State<GlassButton> {
+class _GlassButtonState extends State<GlassButton> with SingleTickerProviderStateMixin {
   bool _isPressed = false;
+  late AnimationController _glowController;
+  late Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _glowController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _glowAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) {
-        setState(() => _isPressed = false);
-        widget.onPressed?.call();
-      },
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedScale(
-        scale: _isPressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOutQuart,
-        child: RepaintBoundary(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(widget.height / 2),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-              child: Container(
-                height: widget.height,
-                width: widget.width,
-                decoration: BoxDecoration(
-                  gradient: AppColors.champagneGoldGradient,
-                  borderRadius: BorderRadius.circular(widget.height / 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.champagneGold.withValues(alpha: 0.35),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: widget.isLoading
-                      ? SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.premiumDarkBg,
-                            ),
-                          ),
-                        )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (widget.icon != null) ...[
-                              Icon(
-                                widget.icon,
-                                color: AppColors.premiumDarkBg,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            Text(
-                              widget.text,
-                              style: TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                fontSize: 17,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.premiumDarkBg,
-                              ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        final isDark = themeProvider.isDarkMode;
+        final useGold = isDark || !widget.useMoonlight;
+        
+        final gradient = useGold 
+            ? AppColors.champagneGoldGradient
+            : AppColors.moonlightGradient;
+        final glowColor = useGold 
+            ? AppColors.champagneGold
+            : AppColors.moonlightCyan;
+        final textColor = useGold 
+            ? AppColors.premiumDarkBg
+            : AppColors.slateText;
+        
+        return GestureDetector(
+          onTapDown: (_) {
+            setState(() => _isPressed = true);
+            _glowController.forward();
+          },
+          onTapUp: (_) {
+            setState(() => _isPressed = false);
+            _glowController.reverse();
+            widget.onPressed?.call();
+          },
+          onTapCancel: () {
+            setState(() => _isPressed = false);
+            _glowController.reverse();
+          },
+          child: AnimatedBuilder(
+            animation: _glowAnimation,
+            builder: (context, child) {
+              return AnimatedScale(
+                scale: _isPressed ? 0.97 : 1.0,
+                duration: const Duration(milliseconds: 150),
+                curve: Curves.easeOutQuart,
+                child: RepaintBoundary(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(widget.height / 2),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(
+                        sigmaX: isDark ? 25 : 15, 
+                        sigmaY: isDark ? 25 : 15,
+                      ),
+                      child: Container(
+                        height: widget.height,
+                        width: widget.width,
+                        decoration: BoxDecoration(
+                          gradient: gradient,
+                          borderRadius: BorderRadius.circular(widget.height / 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: glowColor.withOpacity(0.35 * _glowAnimation.value),
+                              blurRadius: 20 * _glowAnimation.value,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
+                        child: Center(
+                          child: widget.isLoading
+                              ? SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(textColor),
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (widget.icon != null) ...[
+                                      Icon(
+                                        widget.icon,
+                                        color: textColor,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    Text(
+                                      widget.text,
+                                      style: TextStyle(
+                                        fontFamily: 'SF Pro Display',
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w600,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

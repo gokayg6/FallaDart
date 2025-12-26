@@ -2,16 +2,10 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Ana renkler
-  // Ana renkler
-  static const Color primary = Color(0xFFFF4DA6); // Falla Magenta
-  static const Color primaryDark = Color(0xFFD81B60);
-  static const Color primarySoft = Color(0xFFFF80AB);
-  static const Color textMuted = Color(0xFF9E9E9E);
-  static const Color glassLight = Color(0x1AFFFFFF);
-
+  static const Color primary   = Color(0xFFFF4DA6); // Falla Magenta
   static const Color secondary = Color(0xFF3EE3D5); // Aura Aqua
   static const Color accent    = Color(0xFF8A7BFF); // Mistik Mor
-  static const Color background= Color(0xFF0B1021); // Gece Laciverti
+  static const Color background= Color(0xFF0F0F1A); // Masterpiece Dark
   static const Color surface   = Color(0xFF121735); // Derin Yüzey
   
   // Gradient renkler
@@ -22,13 +16,9 @@ class AppColors {
   );
   
   static const LinearGradient primaryGradient = LinearGradient(
+    colors: [Color(0xFFD26AFF), Color(0xFF9B51E0)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [
-      Color(0xFFFF80AB),
-      Color(0xFFFF4DA6),
-      Color(0xFFD81B60),
-    ],
   );
   
   static const LinearGradient secondaryGradient = LinearGradient(
@@ -55,18 +45,18 @@ class AppColors {
     end: Alignment.bottomRight,
   );
   
-  // Background gradient (dark theme)
+  // Background gradient (dark theme) - Masterpiece Glass Settings
   static const LinearGradient backgroundGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [background, Color(0xFF1A1A2E)],
+    colors: [Color(0xFF0F0F1A), Color(0xFF1A1A2E)],
   );
   
-  // Background gradient (light theme) - Cream tones
+  // Background gradient (light theme) - Masterpiece Glass Settings 
   static const LinearGradient lightBackgroundGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [Color(0xFFFDFBF7), Color(0xFFE6DCC3)],
+    colors: [Color(0xFFF0F4F8), Color(0xFFE6EAF0)],
   );
   
   // Karma gradient
@@ -83,161 +73,6 @@ class AppColors {
   
   // Karma rengi
   static const Color karma = Color(0xFFE0C88F);
-  
-  // ==================== iOS 26 PREMIUM GLASSMORPHISM COLORS ====================
-  
-  // Mystic Purple Background Palette (Fal uygulaması için mistik mor tonlar)
-  static const Color mysticPurpleDark = Color(0xFF0D0714);      // Çok koyu mor-siyah
-  static const Color mysticPurpleMid = Color(0xFF1A0F2E);       // Orta koyu mor
-  static const Color mysticViolet = Color(0xFF2D1B4E);          // Derin violet
-  static const Color mysticPurpleAccent = Color(0xFF8B5CF6);    // Parlak mor aksan
-  static const Color mysticMagenta = Color(0xFFB06AB3);         // Magenta aksan
-  static const Color mysticLavender = Color(0xFF9B8ED0);        // Lavanta
-  
-  // Premium Dark Background (Mistik mor tonları)
-  static const Color premiumDarkBg = Color(0xFF0D0714);         // Çok koyu mor-siyah
-  static const Color premiumDarkBgEnd = Color(0xFF150B24);      // Derin mor
-  static const Color premiumAmbientLight = Color(0xFF1F1035);   // Ambient mor
-  
-  // Champagne Gold Palette
-  static const Color champagneGold = Color(0xFFE6D3A3);
-  static const Color warmIvory = Color(0xFFF3ECDC);
-  static const Color subtleBronze = Color(0xFFB8A46A);
-  static const Color deepGold = Color(0xFFC4A962);
-  
-  // Premium Glassmorphism
-  static Color get premiumGlassBackground => Colors.white.withValues(alpha: 0.10);
-  static Color get premiumGlassBorder => Colors.white.withValues(alpha: 0.15);
-  static Color get premiumGlassHighlight => Colors.white.withValues(alpha: 0.08);
-  static Color get premiumGoldGlow => champagneGold.withValues(alpha: 0.30);
-  
-  // Premium Purple Glow
-  static Color get premiumPurpleGlow => mysticPurpleAccent.withValues(alpha: 0.35);
-  static Color get premiumMagentaGlow => mysticMagenta.withValues(alpha: 0.30);
-  
-  // Premium Gradients - MYSTIC PURPLE THEME
-  static const LinearGradient premiumDarkGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      mysticPurpleDark,    // Çok koyu mor-siyah üst
-      mysticPurpleMid,     // Orta koyu mor
-      premiumDarkBgEnd,    // Derin mor alt
-    ],
-    stops: [0.0, 0.5, 1.0],
-  );
-  
-  // Yeni: Mistik mor gradient (daha zengin)
-  static const LinearGradient mysticPurpleGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFF1A0F2E),  // Koyu mor
-      Color(0xFF2D1B4E),  // Derin violet
-      Color(0xFF1F1035),  // Ambient mor
-    ],
-  );
-  
-  // Navbar ve card'lar için mor glow gradient
-  static const LinearGradient purpleGlowGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      Color(0x408B5CF6),  // Yarı saydam parlak mor
-      Color(0x20B06AB3),  // Yarı saydam magenta
-      Color(0x00000000),  // Transparent
-    ],
-  );
-  
-  static const LinearGradient champagneGoldGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [warmIvory, champagneGold, deepGold],
-  );
-  
-  static LinearGradient get premiumGlassGradient => LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Colors.white.withValues(alpha: 0.12),
-      Colors.white.withValues(alpha: 0.05),
-    ],
-  );
-  
-  // Premium Card Decoration
-  static BoxDecoration get premiumGlassCardDecoration => BoxDecoration(
-    gradient: premiumGlassGradient,
-    borderRadius: BorderRadius.circular(22),
-    border: Border.all(
-      color: premiumGlassBorder,
-      width: 1,
-    ),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withValues(alpha: 0.35),
-        blurRadius: 30,
-        offset: const Offset(0, 8),
-      ),
-    ],
-  );
-  
-  // Premium Hero Card Decoration
-  static BoxDecoration get premiumHeroCardDecoration => BoxDecoration(
-    gradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        champagneGold.withValues(alpha: 0.25),
-        subtleBronze.withValues(alpha: 0.15),
-      ],
-    ),
-    borderRadius: BorderRadius.circular(28),
-    border: Border.all(
-      color: champagneGold.withValues(alpha: 0.40),
-      width: 1,
-    ),
-    boxShadow: [
-      BoxShadow(
-        color: subtleBronze.withValues(alpha: 0.25),
-        blurRadius: 40,
-        offset: const Offset(0, 12),
-      ),
-      BoxShadow(
-        color: Colors.black.withValues(alpha: 0.30),
-        blurRadius: 20,
-        offset: const Offset(0, 4),
-      ),
-    ],
-  );
-  
-  // Selected Card Decoration with Gold Glow
-  static BoxDecoration get premiumSelectedCardDecoration => BoxDecoration(
-    gradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        champagneGold.withValues(alpha: 0.20),
-        deepGold.withValues(alpha: 0.12),
-      ],
-    ),
-    borderRadius: BorderRadius.circular(22),
-    border: Border.all(
-      color: champagneGold.withValues(alpha: 0.60),
-      width: 2,
-    ),
-    boxShadow: [
-      BoxShadow(
-        color: champagneGold.withValues(alpha: 0.30),
-        blurRadius: 20,
-        spreadRadius: 0,
-      ),
-      BoxShadow(
-        color: Colors.black.withValues(alpha: 0.40),
-        blurRadius: 30,
-        offset: const Offset(0, 8),
-      ),
-    ],
-  );
   
   // Test type colors
   static const Color love = Color(0xFFFF69B4);
@@ -376,98 +211,414 @@ class AppColors {
     ],
   );
 
-  // ==================== NEW PREMIUM LIGHT THEME (iOS 26) ====================
+  // ==================== LIGHT THEME COLORS ====================
   
-  // Base Colors - Warm & Premium
-  static const Color premiumLightBackground = Color(0xFFFAF7F2); // Warm Ivory - NOT White
-  static const Color premiumLightSurface = Color(0xFFEBE5DA);    // Darker than BG (Sand/Beige tone)
-  // Alternative darker surface for nested cards if needed
-  static const Color premiumLightSurfaceDarker = Color(0xFFE0D8C8);
-
-  // Typography - High Contrast (WCAG AA Compliant)
-  static const Color premiumLightTextPrimary = Color(0xFF1A1814);   // Warm Black (Almost pure black)
-  static const Color premiumLightTextSecondary = Color(0xFF484644); // Warm Dark Gray (High readability)
-  static const Color premiumLightTextTertiary = Color(0xFF6E6B65);  // Medium Gray (Still readable)
+  // Light theme base colors - Masterpiece Light
+  static const Color lightBackground = Color(0xFFF0F4F8);
+  static const Color lightSurface = Color(0xFFFFF5E6);
+  static const Color lightCardBackground = Color(0xFFFFEED5);
   
-  // Accents for Light Theme
-  static const Color premiumLightAccent = Color(0xFF996515);        // Goldenrod/Bronze - readable on light
-  static const Color premiumLightPrimary = Color(0xFFD81B60);       // Keep Brand Pink but verify contrast
+  // Light theme text colors
+  static Color get lightTextPrimary => Colors.grey[900]!;
+  static Color get lightTextSecondary => Colors.grey[700]!;
+  static Color get lightTextTertiary => Colors.grey[600]!;
+  static Color get lightTextDisabled => Colors.grey[400]!;
   
-  // Gradients for Light Theme
-  static const LinearGradient premiumLightBackgroundGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [premiumLightBackground, Color(0xFFF5F0E6)], // Subtle warm fade
+  // Light theme card gradient - Cream tones
+  static LinearGradient get lightCardGradient => LinearGradient(
+    colors: [Color(0xFFFFEED5), Color(0xFFFFE8D0)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  
+  // Light theme mystical gradient (softer version) - Cream tones
+  static LinearGradient get lightMysticalGradient => LinearGradient(
+    colors: [Color(0xFFFFF0E0), Color(0xFFFFE8D0)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   );
 
-  // Card Decoration - The "Darker than BG" Logic
-  static BoxDecoration get ios26LightCardDecoration => BoxDecoration(
-    color: premiumLightSurface, // Darker than BG
+  // Modern card decoration for light theme
+  static BoxDecoration get modernCardDecorationLight => BoxDecoration(
+    color: lightSurface,
     borderRadius: BorderRadius.circular(24),
     border: Border.all(
-      color: Color(0xFFD6CDB8), // Subtle warm border
-      width: 1.0, 
+      color: Colors.grey.withValues(alpha: 0.15),
+      width: 1,
     ),
     boxShadow: [
       BoxShadow(
-        color: Color(0x14000000), // Soft shadow for depth (approx 8% opacity black)
+        color: Colors.black.withValues(alpha: 0.06),
+        blurRadius: 20,
+        offset: const Offset(0, 8),
+      ),
+      BoxShadow(
+        color: primary.withValues(alpha: 0.03),
+        blurRadius: 30,
+        spreadRadius: -5,
+      ),
+    ],
+  );
+
+  // ==================== MISSING COLORS RESTORED ====================
+  // Restored to support LiquidGlassNavbar and ThemeProvider features
+  
+  static const Color champagneGold = Color(0xFFF7E7CE);
+  static const Color textMuted = Colors.white60;
+  
+  // Mystic Purple colors (for Coffee Fortune Screen)
+  static const Color mysticPurpleDark = Color(0xFF0D0714);
+  static const Color mysticPurpleMid = Color(0xFF1A0F2E);
+  static const Color premiumDarkBgEnd = Color(0xFF150B24);
+  static const Color mysticPurpleAccent = Color(0xFF8B5CF6);
+  static const Color warmIvory = Color(0xFFF3ECDC);
+  static const Color premiumDarkBg = Color(0xFF0D0714);
+  static const Color subtleBronze = Color(0xFFB8A46A);
+  static const Color deepGold = Color(0xFFC4A962);
+  
+  // Premium Dark Gradient (Mystic Purple Theme)
+  static const LinearGradient premiumDarkGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      mysticPurpleDark,
+      mysticPurpleMid,
+      premiumDarkBgEnd,
+    ],
+    stops: [0.0, 0.5, 1.0],
+  );
+  
+  // Champagne Gold Gradient
+  static const LinearGradient champagneGoldGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [warmIvory, champagneGold, deepGold],
+  );
+  
+  // Premium Glassmorphism
+  static Color get premiumGlassBackground => Colors.white.withValues(alpha: 0.10);
+  static Color get premiumGlassBorder => Colors.white.withValues(alpha: 0.15);
+  static Color get premiumGlassHighlight => Colors.white.withValues(alpha: 0.08);
+  static Color get premiumGoldGlow => champagneGold.withValues(alpha: 0.30);
+  
+  static LinearGradient get premiumGlassGradient => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Colors.white.withValues(alpha: 0.12),
+      Colors.white.withValues(alpha: 0.05),
+    ],
+  );
+  
+  // Premium Card Decoration
+  static BoxDecoration get premiumGlassCardDecoration => BoxDecoration(
+    gradient: premiumGlassGradient,
+    borderRadius: BorderRadius.circular(22),
+    border: Border.all(
+      color: premiumGlassBorder,
+      width: 1,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.35),
+        blurRadius: 30,
+        offset: const Offset(0, 8),
+      ),
+    ],
+  );
+  
+  // Premium Hero Card Decoration
+  static BoxDecoration get premiumHeroCardDecoration => BoxDecoration(
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        champagneGold.withValues(alpha: 0.25),
+        subtleBronze.withValues(alpha: 0.15),
+      ],
+    ),
+    borderRadius: BorderRadius.circular(28),
+    border: Border.all(
+      color: champagneGold.withValues(alpha: 0.40),
+      width: 1,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: subtleBronze.withValues(alpha: 0.25),
+        blurRadius: 40,
+        offset: const Offset(0, 12),
+      ),
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.30),
+        blurRadius: 20,
+        offset: const Offset(0, 4),
+      ),
+    ],
+  );
+  
+  // Selected Card Decoration with Gold Glow
+  static BoxDecoration get premiumSelectedCardDecoration => BoxDecoration(
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        champagneGold.withValues(alpha: 0.20),
+        deepGold.withValues(alpha: 0.12),
+      ],
+    ),
+    borderRadius: BorderRadius.circular(22),
+    border: Border.all(
+      color: champagneGold.withValues(alpha: 0.60),
+      width: 2,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: champagneGold.withValues(alpha: 0.30),
+        blurRadius: 20,
+        spreadRadius: 0,
+      ),
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.40),
+        blurRadius: 30,
+        offset: const Offset(0, 8),
+      ),
+    ],
+  );
+  
+  // ==================== ULTRA-PREMIUM DESIGN TOKENS ====================
+  // iOS 26 Glassmorphism + Liquid Glass Hybrid System
+  
+  // ===================== LIGHT MODE: PEARL GLASS SYSTEM =====================
+  
+  // Base: Soft Pearl / Porcelain Layers
+  static const Color pearlWhite = Color(0xFFF8F9FC);        // Primary background
+  static const Color porcelainMist = Color(0xFFF0F2F7);     // Secondary surface
+  static const Color pearlGlassBase = Color(0xFFFCFDFE);    // Glass card base
+  static const Color ivoryFrost = Color(0xFFF5F6F9);        // Frosted overlay
+  
+  // Light Glass Opacity Colors
+  static Color get pearlGlassOpaque => Colors.white.withOpacity(0.85);
+  static Color get pearlGlassSemi => Colors.white.withOpacity(0.75);
+  static Color get pearlGlassMid => Colors.white.withOpacity(0.60);
+  static Color get pearlGlassBorderLight => Colors.white.withOpacity(0.90);
+  
+  // Light Mode Text (Strong Contrast)
+  static const Color slateText = Color(0xFF1E293B);         // Primary text (slate-800)
+  static const Color slateTextMid = Color(0xFF475569);      // Secondary (slate-600)
+  static const Color slateTextMuted = Color(0xFF64748B);    // Tertiary (slate-500)
+  static const Color slateTextDisabled = Color(0xFF94A3B8); // Disabled (slate-400)
+  
+  // ===================== MOONLIGHT CYAN ACCENT SYSTEM =====================
+  // Replaces yellow navbar hover with elegant icy blue
+  
+  static const Color moonlightCyan = Color(0xFF7DD3FC);     // Primary accent (sky-300)
+  static const Color icyBlue = Color(0xFFBAE6FD);           // Hover state (sky-200)
+  static const Color aquaIndigo = Color(0xFF818CF8);        // Active glow (indigo-400)
+  static const Color deepAqua = Color(0xFF38BDF8);          // Pressed state (sky-400)
+  static const Color frostCyan = Color(0xFFE0F2FE);         // Subtle bg (sky-100)
+  
+  // Moonlight Gradients
+  static const LinearGradient moonlightGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [moonlightCyan, aquaIndigo],
+  );
+  
+  static const LinearGradient icyGlowGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [icyBlue, moonlightCyan],
+  );
+  
+  // ===================== DARK MODE: RICH DEPTH SYSTEM =====================
+  
+  // Enhanced Dark Base (Deeper, Richer)
+  static const Color abyssBlack = Color(0xFF08080F);        // Deepest black
+  static const Color richSurface = Color(0xFF101018);       // Rich surface
+  static const Color voidPurple = Color(0xFF0C0A15);        // Mystic void
+  
+  // Dark Glow Effects
+  static Color get mysticGlow => mysticPurpleAccent.withOpacity(0.15);
+  static Color get cyanGlow => moonlightCyan.withOpacity(0.20);
+  static Color get goldGlow => champagneGold.withOpacity(0.25);
+  
+  // ===================== LIGHT MODE GLASS DECORATIONS =====================
+  
+  // Pearl Glass Card (Light Mode)
+  static BoxDecoration get pearlGlassCardDecoration => BoxDecoration(
+    color: pearlGlassOpaque,
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        Colors.white.withOpacity(0.95),
+        pearlGlassSemi,
+      ],
+    ),
+    borderRadius: BorderRadius.circular(24),
+    border: Border.all(
+      color: Colors.white.withOpacity(0.6),
+      width: 1.5,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.04),
+        blurRadius: 20,
+        offset: const Offset(0, 8),
+      ),
+      BoxShadow(
+        color: Colors.black.withOpacity(0.02),
+        blurRadius: 40,
+        spreadRadius: -10,
+      ),
+    ],
+  );
+  
+  // Frosted Pearl Card (Light Mode with blur support)
+  static BoxDecoration get frostedPearlDecoration => BoxDecoration(
+    color: ivoryFrost.withOpacity(0.80),
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(
+      color: Colors.white.withOpacity(0.5),
+      width: 1,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.03),
         blurRadius: 16,
         offset: const Offset(0, 4),
       ),
-      BoxShadow(
-        color: Color(0x0A000000), // Second layer for ambient depth
-        blurRadius: 4,
-        offset: const Offset(0, 1),
-      ),
     ],
   );
-
-  // Selected Card for Light Theme
-  static BoxDecoration get ios26LightSelectedCardDecoration => BoxDecoration(
-    color: premiumLightSurface,
-    borderRadius: BorderRadius.circular(24),
-    border: Border.all(
-      color: premiumLightAccent, // Gold border
-      width: 2.0,
+  
+  // Light Mode Navbar Glass
+  static BoxDecoration get lightNavbarGlassDecoration => BoxDecoration(
+    color: Colors.white.withOpacity(0.80),
+    borderRadius: const BorderRadius.only(
+      topLeft: Radius.circular(28),
+      topRight: Radius.circular(28),
+    ),
+    border: Border(
+      top: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
     ),
     boxShadow: [
       BoxShadow(
-        color: premiumLightAccent.withValues(alpha: 0.20),
-        blurRadius: 12,
-        offset: const Offset(0, 4),
+        color: Colors.black.withOpacity(0.05),
+        blurRadius: 20,
+        offset: const Offset(0, -4),
       ),
     ],
   );
   
-  // Input Fields for Light Theme
-  static BoxDecoration get ios26LightInputDecoration => BoxDecoration(
-    color: Colors.white, // Inputs can be white to stand out from beige cards/bg
-    borderRadius: BorderRadius.circular(16),
-    border: Border.all(
-      color: Color(0xFFCDC5B4),
-      width: 1.0,
-    ),
-  );
-
-  // Legacy mappings for compatibility (redirecting to new system)
-  static const Color lightBackground = premiumLightBackground;
-  static const Color lightSurface = premiumLightSurface; 
-  static const Color lightCardBackground = premiumLightSurface;
+  // ===================== DARK MODE GLASS DECORATIONS =====================
   
-  static Color get lightTextPrimary => premiumLightTextPrimary;
-  static Color get lightTextSecondary => premiumLightTextSecondary;
-  static Color get lightTextTertiary => premiumLightTextTertiary;
-  static Color get lightTextDisabled => Color(0xFFADAAA5);
-
-  static LinearGradient get lightCardGradient => LinearGradient(
-      colors: [premiumLightSurface, premiumLightSurface], // Flat/Subtle for readability
+  // Enhanced Dark Glass Card
+  static BoxDecoration get darkGlassCardDecoration => BoxDecoration(
+    gradient: LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
+      colors: [
+        Colors.white.withOpacity(0.12),
+        Colors.white.withOpacity(0.04),
+      ],
+    ),
+    borderRadius: BorderRadius.circular(24),
+    border: Border.all(
+      color: Colors.white.withOpacity(0.12),
+      width: 1,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: mysticGlow,
+        blurRadius: 30,
+        spreadRadius: 0,
+      ),
+      BoxShadow(
+        color: Colors.black.withOpacity(0.40),
+        blurRadius: 20,
+        offset: const Offset(0, 8),
+      ),
+    ],
   );
+  
+  // Dark Mode Navbar Glass
+  static BoxDecoration get darkNavbarGlassDecoration => BoxDecoration(
+    gradient: LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Colors.white.withOpacity(0.08),
+        Colors.white.withOpacity(0.03),
+      ],
+    ),
+    borderRadius: const BorderRadius.only(
+      topLeft: Radius.circular(28),
+      topRight: Radius.circular(28),
+    ),
+    border: Border(
+      top: BorderSide(color: Colors.white.withOpacity(0.10), width: 0.5),
+    ),
+  );
+  
+  // ===================== THEME-AWARE GLASS HELPERS =====================
+  
+  /// Get glass card decoration based on theme
+  static BoxDecoration getGlassCardDecoration(bool isDark) =>
+      isDark ? darkGlassCardDecoration : pearlGlassCardDecoration;
+  
+  /// Get navbar decoration based on theme
+  static BoxDecoration getNavbarDecoration(bool isDark) =>
+      isDark ? darkNavbarGlassDecoration : lightNavbarGlassDecoration;
+  
+  /// Get navbar active color (moonlight cyan for both themes)
+  static Color getNavbarActiveColor(bool isDark) =>
+      isDark ? moonlightCyan : aquaIndigo;
+  
+  /// Get navbar inactive color based on theme
+  static Color getNavbarInactiveColor(bool isDark) =>
+      isDark ? Colors.white.withOpacity(0.5) : slateTextMuted;
+  
+  /// Get navbar active glow based on theme
+  static BoxShadow getNavbarActiveGlow(bool isDark) => BoxShadow(
+    color: (isDark ? moonlightCyan : aquaIndigo).withOpacity(0.35),
+    blurRadius: 20,
+    spreadRadius: 4,
+  );
+  
+  // ===================== LIGHT MODE BACKGROUND GRADIENTS =====================
+  
+  // Premium Pearl Background (replaces flat white)
+  static const LinearGradient pearlBackgroundGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      pearlWhite,
+      porcelainMist,
+      ivoryFrost,
+    ],
+    stops: [0.0, 0.5, 1.0],
+  );
+  
+  // Soft ambient light gradient overlay
+  static LinearGradient get ambientLightGradient => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      moonlightCyan.withOpacity(0.03),
+      Colors.transparent,
+      aquaIndigo.withOpacity(0.02),
+    ],
+    stops: const [0.0, 0.5, 1.0],
+  );
+  
+  // Legacy compatibility
+  static const Color premiumLightBackground = pearlWhite;
+  static const Color premiumLightSurface = porcelainMist;
+  static const Color premiumLightTextPrimary = slateText;
+  static const Color premiumLightTextSecondary = slateTextMid;
+  static const Color premiumLightTextTertiary = slateTextMuted;
+  static const Color premiumLightAccent = aquaIndigo;
 
-  static LinearGradient get lightMysticalGradient => premiumLightBackgroundGradient;
-
-  static BoxDecoration get modernCardDecorationLight => ios26LightCardDecoration;
 
   // ==================== THEME-AWARE HELPERS ====================
   
@@ -504,7 +655,7 @@ class AppColors {
   
   /// Get border color based on theme
   static Color getBorderColor(bool isDark) => 
-      isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.25);
+      isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.15);
   
   /// Get icon color based on theme
   static Color getIconColor(bool isDark) => isDark ? Colors.white : Colors.grey[800]!;
@@ -522,7 +673,7 @@ class AppColors {
   
   /// Get container border color based on theme
   static Color getContainerBorder(bool isDark) => 
-      isDark ? Colors.white.withValues(alpha: 0.2) : Colors.grey[500]!;
+      isDark ? Colors.white.withValues(alpha: 0.2) : Colors.grey[400]!;
   
   /// Get input text color based on theme
   static Color getInputTextColor(bool isDark) => 
@@ -538,53 +689,5 @@ class AppColors {
   
   /// Get input border color based on theme
   static Color getInputBorderColor(bool isDark) => 
-      isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey[400]!;
-
-  // ==================== GLASS STYLING HELPERS ====================
-
-  /// Get glass gradient based on theme
-  static LinearGradient getGlassGradient(bool isDark) {
-    if (isDark) {
-      return LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withValues(alpha: 0.15),
-          Colors.white.withValues(alpha: 0.05),
-          Colors.white.withValues(alpha: 0.02),
-        ],
-      );
-    } else {
-      // Light mode: Frosted Milk / Smoked Glass - Daha opak ve görünür
-      return LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-         Colors.white.withValues(alpha: 0.85), // Daha opak
-         Colors.white.withValues(alpha: 0.65), // Daha opak
-        ],
-      );
-    }
-  }
-
-  /// Get glass border color based on theme
-  static Color getGlassBorderColor(bool isDark) {
-    if (isDark) {
-      return Colors.white.withValues(alpha: 0.15);
-    } else {
-       return Color(0xFF2D2D2D).withValues(alpha: 0.20); // Daha görünür koyu border
-    }
-  }
-
-  /// Get glass shadow color based on theme
-  static Color getGlassShadowColor(bool isDark) {
-    if (isDark) {
-      return Colors.black.withValues(alpha: 0.2);
-    } else {
-      return Colors.black.withValues(alpha: 0.15); // Daha görünür shadow
-    }
-  }
-  
-  /// Get glass text color
-  static Color getGlassTextColor(bool isDark) => isDark ? Colors.white : lightTextPrimary;
+      isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey[300]!;
 }

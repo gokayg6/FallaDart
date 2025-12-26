@@ -7,9 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/liquid_glass_widgets.dart';
-import '../../core/widgets/liquid_glass_navbar.dart';
-import '../../core/widgets/mystical_button.dart';
+import '../../core/widgets/glassmorphism_components.dart';
+import '../../providers/theme_provider.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/constants/pricing_constants.dart';
 import '../../core/models/fortune_type.dart';
@@ -17,7 +16,6 @@ import '../../core/models/fortune_model.dart' as fm;
 import '../../core/services/fortune_service.dart';
 import '../../core/services/firebase_service.dart';
 import '../../core/widgets/mystical_loading.dart';
-import '../../providers/theme_provider.dart';
 import '../../core/services/ads_service.dart';
 import '../../core/providers/user_provider.dart';
 import 'fortune_result_screen.dart';
@@ -208,55 +206,61 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
     );
   }
 
+  @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: themeProvider.backgroundGradient,
-        ),
-        child: Stack(
-          children: [
-            // Animated background particles
-            ...List.generate(20, (index) => _buildFloatingParticle(index)),
-            
-            // Main content
-            SafeArea(
-              child: Column(
-                children: [
-                  _buildLiquidGlassHeader(),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      physics: const BouncingScrollPhysics(),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 20),
-                          _buildHeroSection(),
-                          const SizedBox(height: 24),
-                          _buildImageUploadSection(),
-                          const SizedBox(height: 24),
-                          _buildQuestionSection(),
-                          const SizedBox(height: 24),
-                          _buildInstructionsSection(),
-                          const SizedBox(height: 100),
-                        ],
-                      ),
-                    ),
-                  ),
-                  _buildActionBar(),
-                ],
-              ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: themeProvider.backgroundGradient,
             ),
-          ],
-        ),
-      ),
+            child: Stack(
+              children: [
+                // Animated background particles (only in dark mode for performance)
+                if (isDark)
+                  ...List.generate(15, (index) => _buildFloatingParticle(index, isDark)),
+                
+                // Main content
+                SafeArea(
+                  child: Column(
+                    children: [
+                      _buildLiquidGlassHeader(isDark),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          physics: const BouncingScrollPhysics(),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 20),
+                              _buildHeroSection(isDark),
+                              const SizedBox(height: 24),
+                              _buildImageUploadSection(isDark),
+                              const SizedBox(height: 24),
+                              _buildQuestionSection(isDark),
+                              const SizedBox(height: 24),
+                              _buildInstructionsSection(isDark),
+                              const SizedBox(height: 100),
+                            ],
+                          ),
+                        ),
+                      ),
+                      _buildActionBar(isDark),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildFloatingParticle(int index) {
+  Widget _buildFloatingParticle(int index, bool isDark) {
     final random = math.Random(index);
     final size = 2.0 + random.nextDouble() * 4;
     final left = random.nextDouble() * MediaQuery.of(context).size.width;
@@ -275,10 +279,10 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
             height: size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.mysticPurpleAccent.withOpacity(0.15 + value.abs() * 0.1),
+              color: (isDark ? AppColors.mysticPurpleAccent : AppColors.primary).withOpacity(0.15 + value.abs() * 0.1),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.mysticPurpleAccent.withOpacity(0.2),
+                  color: (isDark ? AppColors.mysticPurpleAccent : AppColors.primary).withOpacity(0.2),
                   blurRadius: size * 2,
                   spreadRadius: size / 2,
                 ),
@@ -290,82 +294,110 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
     );
   }
 
-  Widget _buildLiquidGlassHeader() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: LiquidGlassCard(
-        borderRadius: 20,
-        blurAmount: 15,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        child: Row(
-          children: [
-            // Back button
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.1) : AppColors.premiumLightSurface,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.close,
-                  color: AppColors.getIconColor(isDark),
-                  size: 20,
-                ),
+  Widget _buildLiquidGlassHeader(bool isDark) {
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.white.withOpacity(0.12),
+                Colors.white.withOpacity(0.05),
+              ],
+            ),
+            border: Border(
+              bottom: BorderSide(
+                color: AppColors.champagneGold.withOpacity(0.2),
+                width: 1,
               ),
             ),
-            const SizedBox(width: 16),
-            
-            // Title with coffee cup icon
-            Expanded(
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.champagneGold.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              // Back button with glass effect
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.05),
+                      ],
                     ),
-                    child: const Text('☕', style: TextStyle(fontSize: 22)),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppStrings.coffeeFortune,
-                        style: TextStyle(
-                          fontFamily: 'SF Pro Display',
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.getTextPrimary(isDark),
-                        ),
-                      ),
-                      Text(
-                        'Fincanınızın sırları',
-                        style: TextStyle(
-                          fontFamily: 'SF Pro Text',
-                          fontSize: 12,
-                          color: AppColors.getTextSecondary(isDark),
-                        ),
-                      ),
-                    ],
+                  child: Icon(
+                    Icons.arrow_back_ios_new,
+                    color: AppColors.getTextPrimary(isDark),
+                    size: 20,
                   ),
-                ],
+                ),
               ),
-            ),
-            
-            const KarmaCostBadge(fortuneType: 'coffee'),
-          ],
+              const SizedBox(width: 16),
+              
+              // Title with coffee cup icon
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.champagneGold.withOpacity(0.3),
+                            AppColors.champagneGold.withOpacity(0.1),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text('☕', style: TextStyle(fontSize: 22)),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppStrings.coffeeFortune,
+                          style: TextStyle(
+                            fontFamily: 'SF Pro Display',
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.getTextPrimary(isDark),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        Text(
+                          'Fincanınızın sırları',
+                          style: TextStyle(
+                            fontFamily: 'SF Pro Text',
+                            fontSize: 12,
+                            color: AppColors.getTextSecondary(isDark),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              const KarmaCostBadge(fortuneType: 'coffee'),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeroSection() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
+  Widget _buildHeroSection(bool isDark) {
     return AnimatedBuilder(
       animation: _glowController,
       builder: (context, child) {
@@ -377,8 +409,8 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
-                isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
+                Colors.white.withOpacity(0.08),
+                Colors.white.withOpacity(0.03),
               ],
             ),
             borderRadius: BorderRadius.circular(24),
@@ -441,7 +473,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
                       fontFamily: 'SF Pro Display',
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.getTextPrimary(isDark),
+                      color: AppColors.champagneGold,
                       letterSpacing: 0.5,
                     ),
                     textAlign: TextAlign.center,
@@ -453,7 +485,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
                       fontFamily: 'SF Pro Text',
                       fontSize: 14,
                       height: 1.6,
-                      color: AppColors.getTextSecondary(isDark),
+                      color: Colors.white.withOpacity(0.7),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -466,8 +498,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
     );
   }
 
-  Widget _buildImageUploadSection() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
+  Widget _buildImageUploadSection(bool isDark) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
@@ -479,13 +510,13 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
-                isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
+                Colors.white.withOpacity(0.1),
+                Colors.white.withOpacity(0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.15) : AppColors.premiumLightTextSecondary.withOpacity(0.2),
+              color: Colors.white.withOpacity(0.15),
             ),
           ),
           child: Column(
@@ -508,7 +539,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
                       fontFamily: 'SF Pro Display',
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.getTextPrimary(isDark),
+                      color: AppColors.warmIvory,
                     ),
                   ),
                 ],
@@ -538,7 +569,6 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
   }
 
   Widget _buildUploadButton(IconData icon, String label, VoidCallback onTap) {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -574,7 +604,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
                 fontFamily: 'SF Pro Text',
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: isDark ? AppColors.champagneGold : AppColors.getTextPrimary(isDark),
+                color: AppColors.champagneGold,
               ),
             ),
           ],
@@ -584,19 +614,18 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
   }
 
   Widget _buildEmptyImagePlaceholder() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     return Container(
       height: 120,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
-            isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.01),
+            Colors.white.withOpacity(0.05),
+            Colors.white.withOpacity(0.02),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.1) : AppColors.premiumLightTextSecondary.withOpacity(0.2),
+          color: Colors.white.withOpacity(0.1),
           style: BorderStyle.solid,
         ),
       ),
@@ -614,7 +643,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
               AppStrings.noPhotoSelected,
               style: TextStyle(
                 fontFamily: 'SF Pro Text',
-                color: AppColors.getTextSecondary(isDark),
+                color: Colors.white.withOpacity(0.4),
                 fontSize: 14,
               ),
             ),
@@ -689,8 +718,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
     );
   }
 
-  Widget _buildQuestionSection() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
+  Widget _buildQuestionSection(bool isDark) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
@@ -702,12 +730,12 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
-                isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
+                Colors.white.withOpacity(0.1),
+                Colors.white.withOpacity(0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isDark ? Colors.white.withOpacity(0.15) : AppColors.premiumLightTextSecondary.withOpacity(0.2)),
+            border: Border.all(color: Colors.white.withOpacity(0.15)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -729,7 +757,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
                       fontFamily: 'SF Pro Display',
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.getTextPrimary(isDark),
+                      color: AppColors.warmIvory,
                     ),
                   ),
                 ],
@@ -739,25 +767,25 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
-                      isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.02),
+                      Colors.white.withOpacity(0.08),
+                      Colors.white.withOpacity(0.04),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : AppColors.premiumLightTextSecondary.withOpacity(0.2)),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
                 ),
                 child: TextField(
                   onChanged: (v) => setState(() => _question = v.trim().isEmpty ? null : v.trim()),
                   style: TextStyle(
                     fontFamily: 'SF Pro Text',
-                    color: AppColors.getTextPrimary(isDark),
+                    color: AppColors.warmIvory,
                     fontSize: 15,
                   ),
                   maxLines: 3,
                   decoration: InputDecoration(
                     hintText: 'Falınızda öğrenmek istediğiniz bir konu var mı?',
                     hintStyle: TextStyle(
-                      color: AppColors.getTextSecondary(isDark),
+                      color: Colors.white.withOpacity(0.35),
                       fontSize: 14,
                     ),
                     border: InputBorder.none,
@@ -772,8 +800,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
     );
   }
 
-  Widget _buildInstructionsSection() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
+  Widget _buildInstructionsSection(bool isDark) {
     final instructions = [
       {'icon': '☕', 'title': 'Fincanı Çevirin', 'desc': 'Kahveyi içtikten sonra fincanı tabağın üzerine kapatın'},
       {'icon': '⏳', 'title': 'Bekleyin', 'desc': 'Telvesinin kuruyup şekillenmesi için birkaç dakika bekleyin'},
@@ -791,12 +818,12 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
-                isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.02),
+                Colors.white.withOpacity(0.08),
+                Colors.white.withOpacity(0.04),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isDark ? Colors.white.withOpacity(0.12) : AppColors.premiumLightTextSecondary.withOpacity(0.2)),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -818,7 +845,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
                       fontFamily: 'SF Pro Display',
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.getTextPrimary(isDark),
+                      color: AppColors.warmIvory,
                     ),
                   ),
                 ],
@@ -859,7 +886,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
                                 fontFamily: 'SF Pro Text',
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.getTextPrimary(isDark),
+                                color: AppColors.warmIvory,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -868,7 +895,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
                               style: TextStyle(
                                 fontFamily: 'SF Pro Text',
                                 fontSize: 13,
-                                color: AppColors.getTextSecondary(isDark),
+                                color: Colors.white.withOpacity(0.6),
                                 height: 1.4,
                               ),
                             ),
@@ -886,7 +913,7 @@ class _CoffeeFortuneScreenState extends State<CoffeeFortuneScreen>
     );
   }
 
-  Widget _buildActionBar() {
+  Widget _buildActionBar(bool isDark) {
     final hasImages = _selectedImages.isNotEmpty;
     
     return ClipRRect(

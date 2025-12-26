@@ -22,7 +22,6 @@ import '../../core/widgets/image_viewer.dart';
 import 'dream_draw_screen.dart';
 import 'fortune_selection_screen.dart';
 import '../../core/utils/share_utils.dart';
-import '../../core/widgets/shareable_fortune_card.dart';
 import '../../core/utils/helpers.dart';
 
 // Reklam widget'ı - görünür olduğunda reklam gösterir
@@ -237,11 +236,7 @@ class _FortuneResultScreenState extends State<FortuneResultScreen>
         _availableAt = raw.toDate();
       }
       setState(() {});
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error loading availableAt: $e');
-      }
-    }
+    } catch (_) {}
   }
 
   bool get _isLocked {
@@ -274,11 +269,7 @@ class _FortuneResultScreenState extends State<FortuneResultScreen>
         bool ok = false;
         try { 
           ok = await loaded.future.timeout(const Duration(seconds: 5)); 
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Rewarded ad load timeout or error: $e');
-          }
-        }
+        } catch (_) {}
         
         if (ok) {
           // Reklam yüklendi, şimdi göster
@@ -454,11 +445,7 @@ class _FortuneResultScreenState extends State<FortuneResultScreen>
         _isFavorite = fav;
         _rating = rt;
       });
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error loading favorite/rating from Firestore: $e');
-      }
-    }
+    } catch (_) {}
   }
 
   void _toggleFavorite() async {
@@ -540,100 +527,18 @@ class _FortuneResultScreenState extends State<FortuneResultScreen>
     }
 
     final title = widget.fortune.title;
-    final rawText = widget.fortune.interpretation;
-    final cleaned = Helpers.cleanMarkdown(rawText);
-    final sentences = cleaned
-        .split(RegExp(r'[.!?]+'))
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    // Sadece ilk cümleyi al (paylaşım için kısa tut)
-    final shortText = sentences.isNotEmpty 
-        ? sentences.first + (sentences.first.endsWith('.') ? '' : '.')
-        : cleaned.substring(0, cleaned.length > 100 ? 100 : cleaned.length) + '...';
-
-    final subtitle = widget.fortune.typeDisplayName;
+    final text = widget.fortune.interpretation;
+    final content = '$title\n\n$text\n\nFalla ile falına bak!';
 
     try {
-      if (!mounted) return;
-      await showDialog(
-        context: context,
-        barrierColor: Colors.black87,
-        builder: (context) => Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: EdgeInsets.zero,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // Ekran boyutuna göre ölçekle
-              final screenWidth = MediaQuery.of(context).size.width;
-              final scale = (screenWidth / 1080).clamp(0.3, 1.0);
-              
-              return Stack(
-                children: [
-                  Center(
-                    child: Transform.scale(
-                      scale: scale,
-                      child: SingleChildScrollView(
-                        child: ShareableFortuneCard(
-                          title: title,
-                          subtitle: subtitle,
-                          shortText: shortText,
-                          repaintKey: _cardKey,
-                        ),
-                      ),
-                    ),
-                  ),
-              Positioned(
-                top: 40,
-                right: 20,
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.share, color: Colors.white, size: 28),
-                      onPressed: () async {
-                        try {
-                          final shareText = AppStrings.isEnglish
-                              ? 'Discover your fortune with Falla Aura!'
-                              : 'Falla Aura ile falını keşfet!';
-
-                          await ShareUtils.captureAndShare(
-                            key: _cardKey,
-                            text: shareText,
-                            subject: title,
-                          );
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('${AppStrings.shareError} $e'),
-                                backgroundColor: AppColors.error,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                    ),
-                    IconButton(
-                      icon:
-                          const Icon(Icons.close, color: Colors.white, size: 28),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-                ],
-              );
-            },
-          ),
-        ),
+      await ShareUtils.captureAndShare(
+        key: _cardKey,
+        text: content,
+        subject: title,
       );
     } catch (e) {
-      // Eğer görüntü paylaşımı sırasında hata olursa, sadece metin paylaş
-      final content = '$title\n\n$shortText\n\nFalla ile falına bak!';
-      debugPrint('Share fortune dialog failed, falling back to text share: $e');
+      // Eğer görüntü paylaşımı başarısız olursa, sadece metin paylaş
+      debugPrint('ShareUtils failed, using text share: $e');
       try {
         await Share.share(content, subject: title);
       } catch (shareError) {
@@ -1317,9 +1222,7 @@ class _FortuneResultScreenState extends State<FortuneResultScreen>
               ),
               const SizedBox(height: 16),
               SelectableText(
-                widget.fortune.type == FortuneType.face
-                    ? Helpers.formatFaceFortuneText(widget.fortune.interpretation)
-                    : Helpers.cleanMarkdown(widget.fortune.interpretation),
+                Helpers.cleanMarkdown(widget.fortune.interpretation),
                 style: AppTextStyles.fortuneResult.copyWith(
                   color: Colors.white,
                   height: 1.6,

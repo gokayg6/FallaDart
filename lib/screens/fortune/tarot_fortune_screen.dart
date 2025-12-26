@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
-import '../../providers/theme_provider.dart';
 
 import 'fortune_result_screen.dart';
 import '../../core/constants/app_colors.dart';
@@ -369,8 +368,6 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
     return PremiumScaffold(
       body: Stack(
         children: [
@@ -409,7 +406,6 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
   }
 
   Widget _buildHeroSection() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: AnimatedBuilder(
@@ -427,13 +423,13 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
-                      isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
+                      Colors.white.withOpacity(0.08),
+                      Colors.white.withOpacity(0.03),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isDark ? AppColors.champagneGold.withOpacity(glowIntensity) : AppColors.premiumLightTextSecondary.withOpacity(0.3),
+                    color: AppColors.champagneGold.withOpacity(glowIntensity),
                     width: 1,
                   ),
                   boxShadow: [
@@ -491,7 +487,7 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
                               fontFamily: 'SF Pro Display',
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: isDark ? AppColors.champagneGold : AppColors.getTextPrimary(isDark),
+                              color: AppColors.champagneGold,
                               letterSpacing: 0.3,
                             ),
                           ),
@@ -504,8 +500,7 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
                               fontFamily: 'SF Pro Text',
                               fontSize: 13,
                               height: 1.4,
-
-                              color: AppColors.getTextSecondary(isDark),
+                              color: Colors.white.withOpacity(0.6),
                             ),
                           ),
                         ],
@@ -570,7 +565,6 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
   }
 
   Widget _buildHeader() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     return ClipRRect(
         child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -581,13 +575,13 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.05),
-                isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
+                Colors.white.withOpacity(0.12),
+                Colors.white.withOpacity(0.05),
               ],
             ),
             border: Border(
               bottom: BorderSide(
-                color: isDark ? AppColors.champagneGold.withOpacity(0.2) : AppColors.premiumLightTextSecondary.withOpacity(0.2),
+                color: AppColors.champagneGold.withOpacity(0.2),
                 width: 1,
               ),
             ),
@@ -608,19 +602,18 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.08),
-                        isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.05),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDark ? Colors.white.withOpacity(0.1) : AppColors.premiumLightTextSecondary.withOpacity(0.2),
+                      color: Colors.white.withOpacity(0.1),
                     ),
                   ),
                   child: Icon(
                     Icons.arrow_back_ios_new,
-
-                    color: AppColors.getIconColor(isDark),
+                    color: AppColors.warmIvory,
                     size: 20,
                   ),
                 ),
@@ -655,7 +648,7 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
                               fontFamily: 'SF Pro Display',
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.getTextPrimary(isDark),
+                              color: AppColors.warmIvory,
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -664,7 +657,7 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
                             style: TextStyle(
                               fontFamily: 'SF Pro Text',
                               fontSize: 12,
-                              color: AppColors.getTextSecondary(isDark),
+                              color: Colors.white.withOpacity(0.5),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -685,15 +678,14 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
   }
 
   Widget _buildSlotsSection() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     final selectedCount = _selectedSlots.where((s) => s != null).length;
     
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.black.withOpacity(0.2) : AppColors.premiumLightSurface.withOpacity(0.5),
+        color: Colors.black.withOpacity(0.2),
         border: Border.symmetric(
-          horizontal: BorderSide(color: isDark ? Colors.white.withOpacity(0.05) : AppColors.premiumLightTextSecondary.withOpacity(0.1)),
+          horizontal: BorderSide(color: Colors.white.withOpacity(0.05)),
         ),
       ),
       child: Column(
@@ -703,7 +695,7 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
             style: TextStyle(
               fontFamily: 'SF Pro Display',
               fontSize: 16,
-              color: isDark ? AppColors.champagneGold : AppColors.getTextPrimary(isDark),
+              color: AppColors.champagneGold,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
             ),
@@ -745,7 +737,6 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
   }
   
   Widget _buildEmptySlotVisual(double width, double height, {Key? key}) {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     return AnimatedBuilder(
       key: key,
       animation: _pulseController,
@@ -757,7 +748,7 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.3 * glow) : AppColors.premiumLightTextSecondary.withOpacity(0.4 * glow),
+              color: Colors.white.withOpacity(0.3 * glow),
               width: 1,
               style: BorderStyle.solid,
             ),
@@ -765,7 +756,7 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                isDark ? Colors.white.withOpacity(0.05 * glow) : Colors.black.withOpacity(0.05 * glow),
+                Colors.white.withOpacity(0.05 * glow),
                 Colors.transparent,
               ],
             ),
@@ -779,7 +770,7 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
           child: Center(
             child: Icon(
               Icons.add,
-              color: isDark ? Colors.white.withOpacity(0.3 * glow) : AppColors.premiumLightTextSecondary.withOpacity(0.4 * glow),
+              color: Colors.white.withOpacity(0.3 * glow),
               size: 24,
             ),
           ),
@@ -855,38 +846,16 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
              opacity: isSelected ? 0.0 : 1.0,
              child: GestureDetector(
                onTap: () {
-                 final cardKey = GlobalKey(); // Needs to be attached? No, see below.
-                 // We can't use context.findRenderObject efficiently here without a key that persists or is attached
-                 // But we can just use the context of this specific item if we extract it.
-                 // For now, let's just use the current approach.
-                 // Actually passing GlobalKey inside itemBuilder creates a new key every build which is bad for animation finding.
-                 // Better use a key mapped to index or simple context finding.
-                 // _onCardTap expects a key to find render object.
-                 // Let's pass context.
+                 final cardKey = GlobalKey();
                },
                child: Builder(
                 builder: (context) {
                    return GestureDetector(
                      onTap: () {
-                        // Pass a dummy key that we attach to this context? 
-                        // Or modify _onCardTap to take context.
-                        // Since I can't easily change _onCardTap signature without changing other things,
-                        // I will create a key here, but it wont work well because it's new every time.
-                        // However, since we are inside a builder, the context is fresh. 
-                        // Actually, I should use the key I put on Container.
-                        // But I can't pass a key I just created to functions expecting it to consistantly identify a widget.
-                        // BUT, for finding position relative to screen at that EXACT moment, it might work if the widget acts on it immediately.
-                        // Let's try passing the context directly if possible, but _onCardTap takes GlobalKey.
-                        // I'll keep the key generation here, for immediate tap it works.
                         final cardKey = GlobalKey(); 
                         _onCardTap(index, cardKey);
                      },
                      child: Container(
-                       // key: cardKey, // Cannot use GlobalKey in list without being unique/persistent? 
-                       // GlobalKey() in build is bad practice but works for one-shot tap detection if widget is built.
-                       // Actually, Flutter throws error if key is not constant or state persistent.
-                       // Instead, let's use context.findRenderObject() inside onTap.
-                       // I will change _onCardTap to take RenderBox or Context.
                        child: _buildCardVisuaWithKey(index, cardWidth), 
                      ),
                    );
@@ -1054,7 +1023,6 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
   }
 
   Widget _buildGenerateBar() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode; // Note: Consumer<UserProvider> is below, but theme provider is needed for styles
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         final requiredKarma = PricingConstants.getFortuneCost('tarot');
@@ -1073,12 +1041,12 @@ class _TarotFortuneScreenState extends State<TarotFortuneScreen> with TickerProv
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.08),
-                    isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
+                    Colors.white.withOpacity(0.12),
+                    Colors.white.withOpacity(0.06),
                   ],
                 ),
                 border: Border(
-                  top: BorderSide(color: isDark ? Colors.white.withOpacity(0.15) : AppColors.premiumLightTextSecondary.withOpacity(0.2), width: 0.5),
+                  top: BorderSide(color: Colors.white.withOpacity(0.15), width: 0.5),
                 ),
               ),
               child: Opacity(

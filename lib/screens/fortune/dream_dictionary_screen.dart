@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'fortune_result_screen.dart';
 import '../../core/constants/app_colors.dart';
@@ -8,17 +7,14 @@ import '../../core/constants/app_strings.dart';
 import '../../core/models/fortune_model.dart' as fm;
 import '../../core/models/fortune_type.dart';
 import '../../core/services/fortune_service.dart';
+import '../../core/widgets/mystical_card.dart';
 import '../../core/widgets/mystical_loading.dart';
 import '../../core/services/ads_service.dart';
 import '../../widgets/fortune/karma_cost_badge.dart';
-import '../../core/widgets/liquid_glass_navbar.dart';
-import '../../core/widgets/liquid_glass_widgets.dart';
 import '../../providers/theme_provider.dart';
 import '../../core/services/ai_service.dart';
 import '../../core/providers/user_provider.dart';
 import 'dart:async';
-
-import '../../core/widgets/mystical_button.dart';
 
 class DreamDictionaryScreen extends StatefulWidget {
   const DreamDictionaryScreen({Key? key}) : super(key: key);
@@ -113,19 +109,9 @@ class _DreamDictionaryScreenState extends State<DreamDictionaryScreen> {
           onAdFailedToLoad: (_) => loaded.complete(false),
         );
         bool ok = false;
-        try { 
-          ok = await loaded.future.timeout(const Duration(seconds: 2)); 
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Interstitial ad load timeout or error: $e');
-          }
-        }
+        try { ok = await loaded.future.timeout(const Duration(seconds: 2)); } catch (_) {}
         if (ok) { await _ads.showInterstitialAd(); }
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('Error showing interstitial ad: $e');
-        }
-      }
+      } catch (_) {}
 
       Navigator.push(
         context,
@@ -179,41 +165,30 @@ class _DreamDictionaryScreenState extends State<DreamDictionaryScreen> {
   Widget _buildHeader() {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
-    final textColor = Colors.white; // Force white text for better contrast on premium background
+    final textColor = AppColors.getTextPrimary(isDark);
     
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: LiquidGlassCard(
-        borderRadius: 20,
-        blurAmount: 15,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: Icon(Icons.arrow_back_ios_new_rounded, color: textColor, size: 20),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(Icons.arrow_back, color: textColor),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              AppStrings.isEnglish ? 'Dream Dictionary' : 'Rüya Sözlüğü',
+              style: AppTextStyles.headingLarge.copyWith(color: textColor),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                AppStrings.isEnglish ? 'Dream Dictionary' : 'Rüya Sözlüğü',
-                style: AppTextStyles.headingLarge.copyWith(
-                  color: textColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
-            const SizedBox(width: 8),
-            const KarmaCostBadge(fortuneType: 'dream'),
-            const SizedBox(width: 12),
-            const Text('📖', style: TextStyle(fontSize: 20)),
-             const SizedBox(width: 12),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          const KarmaCostBadge(fortuneType: 'dream'),
+          const SizedBox(width: 8),
+          const Text('📖', style: TextStyle(fontSize: 24)),
+        ],
       ),
     );
   }
@@ -221,37 +196,42 @@ class _DreamDictionaryScreenState extends State<DreamDictionaryScreen> {
   Widget _buildIntroCard() {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
-        return LiquidGlassCard(
-          padding: const EdgeInsets.all(24),
-          blurAmount: 15,
-          glowColor: const Color(0xFFFFD700).withOpacity(0.3),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFFFD700).withOpacity(0.15),
-                  boxShadow: [
-                     BoxShadow(
-                      color: const Color(0xFFFFD700).withOpacity(0.3),
-                      blurRadius: 15,
-                      spreadRadius: 2,
-                    ),
-                  ],
+        final isDark = themeProvider.isDarkMode;
+        final textColor = AppColors.getTextPrimary(isDark);
+        final cardBg = AppColors.getCardBackground(isDark);
+        
+        return MysticalCard(
+          showGlow: false,
+          enforceAspectRatio: false,
+          toggleFlipOnTap: false,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFFFFD700).withValues(alpha: isDark ? 0.3 : 0.25),
+                  cardBg.withValues(alpha: isDark ? 0.9 : 0.85),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('📖', style: TextStyle(fontSize: 32)),
+                const SizedBox(height: 12),
+                Text(
+                  AppStrings.isEnglish
+                      ? 'Enter a dream symbol or word to discover its meaning'
+                      : 'Rüya sembolü veya kelime girerek anlamını keşfet',
+                  style: AppTextStyles.bodyMedium.copyWith(color: textColor),
+                  textAlign: TextAlign.center,
                 ),
-                child: const Text('📖', style: TextStyle(fontSize: 32)),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                AppStrings.isEnglish
-                    ? 'Enter a dream symbol or word to discover its meaning'
-                    : 'Rüya sembolü veya kelime girerek anlamını keşfet',
-                style: AppTextStyles.bodyMedium.copyWith(color: Colors.white.withOpacity(0.9)),
-                textAlign: TextAlign.center,
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -262,51 +242,79 @@ class _DreamDictionaryScreenState extends State<DreamDictionaryScreen> {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         final isDark = themeProvider.isDarkMode;
-        final inputHintColor = Colors.white54;
+        final cardBg = AppColors.getCardBackground(isDark);
         
-        return LiquidGlassCard(
-          padding: const EdgeInsets.all(20),
-          blurAmount: 20,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                AppStrings.isEnglish ? 'Dream Symbol' : 'Rüya Sembolü',
-                style: AppTextStyles.headingSmall.copyWith(
-                  color: const Color(0xFFFFD700), // Gold
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
+        return MysticalCard(
+          showGlow: false,
+          enforceAspectRatio: false,
+          toggleFlipOnTap: false,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFFFFD700).withValues(alpha: isDark ? 0.25 : 0.2),
+                  cardBg.withValues(alpha: isDark ? 0.9 : 0.85),
+                ],
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _controller,
-                onChanged: (v) => setState(() => _canGenerate = v.trim().isNotEmpty),
-                style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: AppStrings.isEnglish 
-                      ? 'e.g., snake, water, flying...'
-                      : 'örn: yılan, su, uçmak...',
-                  hintStyle: AppTextStyles.bodyMedium.copyWith(color: inputHintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFFFD700)), // Gold
-                  ),
-                  contentPadding: const EdgeInsets.all(16),
-                  filled: true,
-                  fillColor: Colors.black.withOpacity(0.2),
-                ),
-                keyboardType: TextInputType.text,
-              ),
-            ],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Consumer<ThemeProvider>(
+              builder: (context, themeProvider, child) {
+                final isDark = themeProvider.isDarkMode;
+                final textColor = AppColors.getTextPrimary(isDark);
+                final inputTextColor = AppColors.getInputTextColor(isDark);
+                final inputHintColor = AppColors.getInputHintColor(isDark);
+                final inputBorderColor = AppColors.getInputBorderColor(isDark);
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppStrings.isEnglish ? 'Dream Symbol' : 'Rüya Sembolü',
+                      style: AppTextStyles.headingSmall.copyWith(
+                        color: textColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _controller,
+                      onChanged: (v) => setState(() => _canGenerate = v.trim().isNotEmpty),
+                      style: AppTextStyles.bodyMedium.copyWith(color: inputTextColor),
+                      decoration: InputDecoration(
+                        hintText: AppStrings.isEnglish 
+                            ? 'e.g., snake, water, flying...'
+                            : 'örn: yılan, su, uçmak...',
+                        hintStyle: AppTextStyles.bodyMedium.copyWith(color: inputHintColor),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: inputBorderColor),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: inputBorderColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.secondary),
+                        ),
+                        contentPadding: const EdgeInsets.all(12),
+                        filled: true,
+                        fillColor: isDark 
+                            ? Colors.white.withValues(alpha: 0.05)
+                            : Colors.white.withValues(alpha: 0.3),
+                      ),
+                      keyboardType: TextInputType.text,
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         );
       },
@@ -317,25 +325,26 @@ class _DreamDictionaryScreenState extends State<DreamDictionaryScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.2),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1), width: 1)),
+        color: AppColors.cardBackground.withValues(alpha: 0.3),
+        border: const Border(top: BorderSide(color: Colors.white24, width: 1)),
       ),
       child: SizedBox(
         width: double.infinity,
-        child: MysticalButton(
-          text: AppStrings.isEnglish 
-              ? (_canGenerate ? 'Discover Meaning' : 'Enter a Symbol')
-              : (_canGenerate ? 'Anlamını Keşfet' : 'Sembol Gir'),
+        child: ElevatedButton(
           onPressed: _canGenerate ? _generate : null,
-          showGlow: _canGenerate,
-          customGradient: _canGenerate 
-              ? const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA000)]) 
-              : null,
-          customTextStyle: AppTextStyles.buttonLarge.copyWith(
-             color: _canGenerate ? Colors.white : Colors.white38,
-             fontWeight: FontWeight.bold,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-         ),
+          child: Text(
+            AppStrings.isEnglish 
+                ? (_canGenerate ? 'Discover Meaning' : 'Enter a Symbol')
+                : (_canGenerate ? 'Anlamını Keşfet' : 'Sembol Gir'),
+            style: AppTextStyles.buttonLarge.copyWith(color: Colors.white),
+          ),
+        ),
       ),
     );
   }

@@ -31,7 +31,7 @@ class _CoffeeUploadPhotosScreenState extends State<CoffeeUploadPhotosScreen> {
     bool canContinue = _photos.length >= 3;
     
     return Scaffold(
-      backgroundColor: AppColors.getBackground(isDark),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text('Fotoğraf Yükle', style: TextStyle(color: AppColors.getTextPrimary(isDark))),
         backgroundColor: Colors.transparent,
@@ -39,7 +39,11 @@ class _CoffeeUploadPhotosScreenState extends State<CoffeeUploadPhotosScreen> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: Column(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
+        child: Column(
         children: [
           const SizedBox(height: 20),
           Wrap(
@@ -123,6 +127,7 @@ class _CoffeeUploadPhotosScreenState extends State<CoffeeUploadPhotosScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

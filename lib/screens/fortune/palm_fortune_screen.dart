@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'fortune_result_screen.dart';
-import '../../providers/theme_provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/constants/pricing_constants.dart';
@@ -214,9 +213,8 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
     );
   }
 
+  @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
     return PremiumScaffold(
       body: SafeArea(
         child: Column(
@@ -247,7 +245,6 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
   }
 
   Widget _buildHeader() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     return ClipRRect(
         child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -258,13 +255,13 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.05),
-                isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
+                Colors.white.withOpacity(0.12),
+                Colors.white.withOpacity(0.05),
               ],
             ),
             border: Border(
               bottom: BorderSide(
-                color: isDark ? AppColors.champagneGold.withOpacity(0.2) : AppColors.premiumLightTextSecondary.withOpacity(0.2),
+                color: AppColors.champagneGold.withOpacity(0.2),
                 width: 1,
               ),
             ),
@@ -278,18 +275,18 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.08),
-                        isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.05),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDark ? Colors.white.withOpacity(0.1) : AppColors.premiumLightTextSecondary.withOpacity(0.2),
+                      color: Colors.white.withOpacity(0.1),
                     ),
                   ),
                   child: Icon(
                     Icons.arrow_back_ios_new,
-                    color: AppColors.getIconColor(isDark),
+                    color: AppColors.warmIvory,
                     size: 20,
                   ),
                 ),
@@ -326,7 +323,7 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
                               fontFamily: 'SF Pro Display',
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.getTextPrimary(isDark),
+                              color: AppColors.warmIvory,
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -335,7 +332,7 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
                             style: TextStyle(
                               fontFamily: 'SF Pro Text',
                               fontSize: 12,
-                              color: AppColors.getTextSecondary(isDark),
+                              color: Colors.white.withOpacity(0.5),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -355,7 +352,6 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
   }
 
   Widget _buildIntroCard() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
@@ -367,13 +363,13 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
-                isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
+                Colors.white.withOpacity(0.08),
+                Colors.white.withOpacity(0.03),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark ? AppColors.champagneGold.withOpacity(0.3) : AppColors.premiumLightTextSecondary.withOpacity(0.2),
+              color: AppColors.champagneGold.withOpacity(0.3),
               width: 1,
             ),
             boxShadow: [
@@ -419,7 +415,7 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
                   fontFamily: 'SF Pro Display',
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: isDark ? AppColors.champagneGold : AppColors.getTextPrimary(isDark),
+                  color: AppColors.champagneGold,
                   letterSpacing: 0.3,
                 ),
                 textAlign: TextAlign.center,
@@ -433,8 +429,7 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
                   fontFamily: 'SF Pro Text',
                   fontSize: 14,
                   height: 1.5,
-
-                  color: AppColors.getTextSecondary(isDark),
+                  color: Colors.white.withOpacity(0.65),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -446,7 +441,6 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
   }
 
   Widget _buildInstructionsSection() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     final instructions = [
       {'icon': '✋', 'title': AppStrings.isEnglish ? 'Open Your Palm' : 'Elinizi Açın', 'desc': AppStrings.isEnglish ? 'Spread your fingers and open your palm naturally' : 'Parmaklarınızı açın ve avucunuzu doğal şekilde tutun'},
       {'icon': '💡', 'title': AppStrings.isEnglish ? 'Good Lighting' : 'İyi Aydınlatma', 'desc': AppStrings.isEnglish ? 'Make sure palm lines are clearly visible' : 'Avuç çizgilerininizin net görünmesini sağlayın'},
@@ -464,12 +458,12 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
-                isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.02),
+                Colors.white.withOpacity(0.08),
+                Colors.white.withOpacity(0.04),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isDark ? Colors.white.withOpacity(0.12) : AppColors.premiumLightTextSecondary.withOpacity(0.2)),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -491,7 +485,7 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
                       fontFamily: 'SF Pro Display',
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.getTextPrimary(isDark),
+                      color: AppColors.warmIvory,
                     ),
                   ),
                 ],
@@ -532,7 +526,7 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
                                 fontFamily: 'SF Pro Text',
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.getTextPrimary(isDark),
+                                color: AppColors.warmIvory,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -541,7 +535,7 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
                               style: TextStyle(
                                 fontFamily: 'SF Pro Text',
                                 fontSize: 13,
-                                color: AppColors.getTextSecondary(isDark),
+                                color: Colors.white.withOpacity(0.6),
                                 height: 1.4,
                               ),
                             ),
@@ -560,12 +554,11 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
   }
 
   Widget _buildQuestionInput() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(AppStrings.problemOptional, style: PremiumTextStyles.section.copyWith(color: AppColors.getTextPrimary(isDark))),
+          Text(AppStrings.problemOptional, style: PremiumTextStyles.section),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
@@ -573,19 +566,19 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
               child: TextField(
                 onChanged: (v) => setState(() => _question = v.trim().isEmpty ? null : v.trim()),
-                style: TextStyle(color: AppColors.getTextPrimary(isDark), fontFamily: 'SF Pro Text'),
+                style: TextStyle(color: AppColors.warmIvory, fontFamily: 'SF Pro Text'),
                 decoration: InputDecoration(
                   hintText: AppStrings.exampleCareer,
-                  hintStyle: TextStyle(color: AppColors.getTextSecondary(isDark)),
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
                   filled: true,
-                  fillColor: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+                  fillColor: Colors.white.withOpacity(0.08),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: isDark ? Colors.white.withOpacity(0.15) : AppColors.premiumLightTextSecondary.withOpacity(0.2)),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: isDark ? Colors.white.withOpacity(0.15) : AppColors.premiumLightTextSecondary.withOpacity(0.2)),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -613,7 +606,6 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
   }
 
   Widget _buildPalmPicker(String label, bool isLeft, File? image) {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     return GestureDetector(
       onTap: () => _pickImage(isLeft),
       child: ClipRRect(
@@ -624,14 +616,9 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
             aspectRatio: 0.75,
             child: Container(
               decoration: BoxDecoration(
-                gradient: isDark ? AppColors.premiumGlassGradient : LinearGradient(
-                  colors: [
-                    AppColors.premiumLightSurface,
-                    AppColors.premiumLightSurface.withOpacity(0.8),
-                  ],
-                ),
+                gradient: AppColors.premiumGlassGradient,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: isDark ? AppColors.premiumGlassBorder : AppColors.premiumLightTextSecondary.withOpacity(0.2), width: 1),
+                border: Border.all(color: AppColors.premiumGlassBorder, width: 1),
               ),
               child: Stack(
                 fit: StackFit.expand,
@@ -648,7 +635,7 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
                         children: [
                           Icon(Icons.pan_tool_rounded, color: AppColors.champagneGold, size: 36),
                           const SizedBox(height: 8),
-                          Text(label, style: PremiumTextStyles.body.copyWith(color: AppColors.getTextPrimary(isDark))),
+                          Text(label, style: PremiumTextStyles.body),
                         ],
                       ),
                     ),
@@ -680,7 +667,6 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
   }
 
   Widget _buildGenerateBar() {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         final requiredKarma = PricingConstants.getFortuneCost('palm');
@@ -699,12 +685,12 @@ class _PalmFortuneScreenState extends State<PalmFortuneScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
-                    isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.02),
+                    Colors.white.withOpacity(0.08),
+                    Colors.white.withOpacity(0.04),
                   ],
                 ),
                 border: Border(
-                  top: BorderSide(color: isDark ? Colors.white.withOpacity(0.15) : AppColors.premiumLightTextSecondary.withOpacity(0.2), width: 0.5),
+                  top: BorderSide(color: Colors.white.withOpacity(0.15), width: 0.5),
                 ),
               ),
               child: GlassButton(

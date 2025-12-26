@@ -314,7 +314,6 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
     final diameter = MediaQuery.of(context).size.width * 0.82;
     
     return Scaffold(
@@ -423,7 +422,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
               Text(
                 AppStrings.daily1ExtraSpin,
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.getTextTertiary(isDark),
+                  color: Colors.white60,
                   fontSize: 11,
                 ),
               ),

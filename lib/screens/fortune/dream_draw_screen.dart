@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -9,15 +8,13 @@ import '../../core/constants/app_strings.dart';
 import '../../core/services/ai_service.dart';
 import '../../core/services/firebase_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../core/widgets/liquid_glass_navbar.dart';
-import '../../core/widgets/liquid_glass_widgets.dart';
+import '../../core/widgets/mystical_card.dart';
 import '../../core/widgets/mystical_loading.dart';
 import '../../core/widgets/image_viewer.dart';
 import '../../core/models/fortune_model.dart' as fm;
 import 'fortune_result_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../providers/theme_provider.dart';
-import '../../core/widgets/mystical_button.dart';
 
 class DreamDrawScreen extends StatefulWidget {
   final String? initialPrompt;
@@ -99,11 +96,7 @@ class _DreamDrawScreenState extends State<DreamDrawScreen> {
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeOutCubic,
           );
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Error scrolling to bottom: $e');
-          }
-        }
+        } catch (_) {}
       });
 
       // Upload image to Storage and save to readings collection
@@ -222,20 +215,26 @@ class _DreamDrawScreenState extends State<DreamDrawScreen> {
                       _buildStyleCard(),
                       const SizedBox(height: 20),
                       if (_isLoading)
-                        LiquidGlassCard(
-                          padding: const EdgeInsets.all(24),
-                          child: Center(
-                            child: MysticalLoading(
-                              type: MysticalLoadingType.spinner,
-                              size: 32,
-                              color: Colors.white,
+                        MysticalCard(
+                          toggleFlipOnTap: false,
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Center(
+                              child: MysticalLoading(
+                                type: MysticalLoadingType.spinner,
+                                size: 32,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
                       if (_error != null)
-                        LiquidGlassCard(
-                          padding: const EdgeInsets.all(12),
+                        MysticalCard(
+                          toggleFlipOnTap: false,
+                          child: Padding(
+                          padding: EdgeInsets.all(12),
                           child: Text(_error!, style: AppTextStyles.bodyMedium.copyWith(color: Colors.redAccent)),
+                          ),
                         ),
                       if (_imageBytes != null) ...[
                         const SizedBox(height: 20),
@@ -259,136 +258,161 @@ class _DreamDrawScreenState extends State<DreamDrawScreen> {
   Widget _buildHeader() {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
-    final textColor = Colors.white; 
+    final textColor = AppColors.getTextPrimary(isDark);
     
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: LiquidGlassCard(
-        borderRadius: 20,
-        blurAmount: 15,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: Icon(Icons.arrow_back_ios_new_rounded, color: textColor, size: 20),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                AppStrings.drawMyDreamTitle, 
-                style: AppTextStyles.headingLarge.copyWith(
-                  color: textColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const Text('🎨', style: TextStyle(fontSize: 20)),
-             const SizedBox(width: 12),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(Icons.arrow_back, color: textColor),
+          ),
+          const SizedBox(width: 8),
+          Text(AppStrings.drawMyDreamTitle, style: AppTextStyles.headingLarge.copyWith(color: textColor)),
+          const Spacer(),
+          const Text('🎨', style: TextStyle(fontSize: 24)),
+        ],
       ),
     );
   }
 
   Widget _buildPromptCard() => Consumer<ThemeProvider>(
     builder: (context, themeProvider, child) {
-      return LiquidGlassCard(
-        padding: const EdgeInsets.all(20),
-        blurAmount: 20,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              AppStrings.describeYourDream,
-              style: AppTextStyles.headingSmall.copyWith(
-                color: const Color(0xFFFFD700),
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-              ),
+      final isDark = themeProvider.isDarkMode;
+      final inputTextColor = AppColors.getInputTextColor(isDark);
+      final inputHintColor = AppColors.getInputHintColor(isDark);
+      final inputBorderColor = AppColors.getInputBorderColor(isDark);
+      final textColor = AppColors.getTextPrimary(isDark);
+      final cardBg = AppColors.getCardBackground(isDark);
+      
+      return MysticalCard(
+        showGlow: false,
+        enforceAspectRatio: false,
+        toggleFlipOnTap: false,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.secondary.withValues(alpha: isDark ? 0.25 : 0.2),
+                cardBg.withValues(alpha: isDark ? 0.9 : 0.85),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _promptController,
-              style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: AppStrings.dreamDrawExampleHint,
-                hintStyle: AppTextStyles.bodyMedium.copyWith(color: Colors.white54),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+              Text(
+                AppStrings.describeYourDream,
+                style: AppTextStyles.headingSmall.copyWith(
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFFFD700)),
-                ),
-                contentPadding: const EdgeInsets.all(16),
-                filled: true,
-                fillColor: Colors.black.withOpacity(0.2),
               ),
-              maxLines: 5,
-              minLines: 3,
+              const SizedBox(height: 12),
+          TextField(
+            controller: _promptController,
+                style: AppTextStyles.bodyMedium.copyWith(color: inputTextColor),
+            decoration: InputDecoration(
+              hintText: AppStrings.dreamDrawExampleHint,
+                  hintStyle: AppTextStyles.bodyMedium.copyWith(color: inputHintColor),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: inputBorderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: inputBorderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColors.secondary),
+              ),
+              contentPadding: const EdgeInsets.all(12),
+                  filled: true,
+                  fillColor: isDark 
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.white.withValues(alpha: 0.3),
             ),
-          ],
-        ),
-      );
+            maxLines: 5,
+            minLines: 3,
+          ),
+        ],
+      ),
+    ),
+  );
     },
   );
 
   Widget _buildStyleCard() => Consumer<ThemeProvider>(
     builder: (context, themeProvider, child) {
-      return LiquidGlassCard(
-        padding: const EdgeInsets.all(20),
-        blurAmount: 20,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              AppStrings.selectStyle,
-              style: AppTextStyles.headingSmall.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-              ),
+      final isDark = themeProvider.isDarkMode;
+      final textColor = AppColors.getTextPrimary(isDark);
+      final cardBg = AppColors.getCardBackground(isDark);
+      
+      return MysticalCard(
+        showGlow: false,
+        enforceAspectRatio: false,
+        toggleFlipOnTap: false,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    child: Container(
+      width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.secondary.withValues(alpha: isDark ? 0.25 : 0.2),
+                cardBg.withValues(alpha: isDark ? 0.9 : 0.85),
+              ],
             ),
-            const SizedBox(height: 12),
-            _buildStyleChips(),
-          ],
-        ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+              Text(
+                AppStrings.selectStyle,
+                style: AppTextStyles.headingSmall.copyWith(
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+          _buildStyleChips(),
+        ],
+      ),
+    ),
       );
     },
   );
 
-  Widget _buildImageResultCard() => LiquidGlassCard(
+  Widget _buildImageResultCard() => MysticalCard(
+    aspectRatio: 1,
+    toggleFlipOnTap: false,
+    onTap: () => ImageViewer.show(
+      context: context,
+      imageBytes: _imageBytes,
+      title: AppStrings.dreamDrawing,
+    ),
     padding: EdgeInsets.zero,
-    child: InkWell(
-      onTap: () => ImageViewer.show(
-        context: context,
-        imageBytes: _imageBytes,
-        title: AppStrings.dreamDrawing,
-      ),
-      borderRadius: BorderRadius.circular(20),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: Image.memory(_imageBytes!, fit: BoxFit.cover),
-        ),
-      ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.memory(_imageBytes!, fit: BoxFit.cover),
     ),
   );
 
   Widget _buildStyleChips() {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        final textColor = AppColors.getTextPrimary(isDark);
         
     final styles = AppStrings.dreamDrawStyles;
     return Wrap(
@@ -402,7 +426,7 @@ class _DreamDrawScreenState extends State<DreamDrawScreen> {
             style: AppTextStyles.bodySmall.copyWith(
                   color: selected 
                       ? Colors.black
-                      : Colors.white,
+                      : textColor,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -410,13 +434,15 @@ class _DreamDrawScreenState extends State<DreamDrawScreen> {
           onSelected: (v) {
             if (v) setState(() => _style = s);
           },
-          selectedColor: const Color(0xFFFFD700),
-          backgroundColor: Colors.white.withOpacity(0.1),
-          shape: StadiumBorder(
-            side: BorderSide(
-              color: selected ? Colors.transparent : Colors.white24,
-            ),
-          ),
+          selectedColor: Colors.white,
+              backgroundColor: isDark 
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.black.withValues(alpha: 0.05),
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color: isDark ? Colors.white24 : Colors.black.withValues(alpha: 0.2),
+                ),
+              ),
         );
       }).toList(),
         );
@@ -427,13 +453,29 @@ class _DreamDrawScreenState extends State<DreamDrawScreen> {
   Widget _buildGenerateButton() {
     return SizedBox(
       width: double.infinity,
-      child: MysticalButton(
+      child: ElevatedButton.icon(
         onPressed: _isLoading ? null : _generate,
-        text: _isLoading ? AppStrings.drawing : AppStrings.drawMyDreamButton,
-        showGlow: true,
-        customGradient: const LinearGradient(colors: [Color(0xFF9C27B0), Color(0xFF673AB7)]),
-        isLoading: _isLoading,
-        icon: Icons.auto_awesome,
+        icon: _isLoading
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: MysticalLoading(
+                  type: MysticalLoadingType.spinner,
+                  size: 18,
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Icon(Icons.auto_awesome, color: Colors.white),
+        label: Text(
+          _isLoading ? AppStrings.drawing : AppStrings.drawMyDreamButton,
+          style: AppTextStyles.buttonLarge.copyWith(color: Colors.white),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
       ),
     );
   }

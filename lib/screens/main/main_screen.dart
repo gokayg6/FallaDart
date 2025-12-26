@@ -12,10 +12,9 @@ import '../../core/providers/language_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../core/widgets/mystical_button.dart';
 import '../../core/widgets/mystical_loading.dart';
+import '../../core/widgets/zoom_blur_route.dart';
 import '../../core/widgets/liquid_glass_navbar.dart';
-import '../../core/widgets/liquid_glass_widgets.dart'; // Add this line
 import '../../core/services/ads_service.dart';
-import '../../widgets/ads/banner_ad_widget.dart';
 import '../../core/services/ai_service.dart';
 import '../../core/constants/pricing_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -25,6 +24,7 @@ import '../profile/profile_screen.dart';
 import '../history/fortunes_history_screen.dart';
 import '../premium/premium_screen.dart';
 import '../fortune/coffee_fortune_screen.dart';
+
 import '../social/love_compatibility_screen.dart';
 import '../social/soulmate_analysis_screen.dart';
 import '../other/biorhythm_screen.dart';
@@ -40,11 +40,11 @@ import '../fortune/face_fortune_screen.dart';
 import '../astrology/astrology_screen.dart';
 import '../premium/spin_wheel_screen.dart';
 import '../astrology/horoscope_detail_screen.dart';
-
-import '../other/aura_update_screen.dart';
 import '../other/tests_screen.dart';
-
-
+import '../other/aura_update_screen.dart';
+import '../../core/services/quiz_test_service.dart';
+import '../../core/models/quiz_test_model.dart';
+import '../tests/general_test_screen.dart';
 import '../social/social_screen.dart';
 import '../../core/widgets/confetti_animation.dart';
 import '../../core/services/firebase_service.dart';
@@ -81,18 +81,16 @@ class _MainScreenState extends State<MainScreen>
   String? _lastLanguageCode;
   bool _showDailyReward = false;
   bool _showConfetti = false;
+  final GlobalKey _backgroundKey = GlobalKey();
   int _currentStreak = 0;
   int _todayKarmaReward = 0;
   final FirebaseService _firebaseService = FirebaseService();
   List<String> _completedQuests = [];
-  
-  // State for Background Focus/Zoom Effect
-  bool _isContentFocused = false;
-  
-  // Missing fields for features
+  bool _loadingQuests = false;
+  DateTime? _lastQuestLoadTime;
   List<LoveCandidateModel> _loveCandidates = [];
   bool _loadingLoveCandidates = false;
-  bool _loadingQuests = false;
+  bool _questsExpanded = true;
   
   bool get _isEnglish {
     try {
@@ -103,31 +101,14 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
-  Future<void> _handleDeepNavigation(Widget page) async {
-    setState(() => _isContentFocused = true);
-    
-    // Push the route (opaque: false is crucial)
-    await Navigator.push(context, ZoomBlurPageRoute(page: page));
-    
-    // When returning, we 'Focus In' (Zoom In)
-    if (mounted) {
-      setState(() => _isContentFocused = false);
-    }
-  }
-
-  DateTime? _lastQuestLoadTime;
-  bool _isFortuneExpanded = true;
-  bool _hasCheckedPremium = false;
-
-
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _loadInitialData();
     _loadHoroscopes();
-    // _loadPendingRequestsCount();
-    // _startPendingRequestsListener();
+    _loadPendingRequestsCount();
+    _startPendingRequestsListener();
     _loadLoveCandidates();
     // Initialize language code and check daily reward
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -135,23 +116,7 @@ class _MainScreenState extends State<MainScreen>
       _lastLanguageCode = languageProvider.languageCode;
       // Check daily reward on page load
       await _checkDailyRewardAvailability();
-      _checkPremiumStatus();
     });
-  }
-
-  Future<void> _checkPremiumStatus() async {
-    if (_hasCheckedPremium) return;
-    _hasCheckedPremium = true;
-
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    if (!userProvider.isPremium) {
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const PremiumScreen()),
-        );
-      }
-    }
   }
 
   @override
@@ -323,152 +288,72 @@ class _MainScreenState extends State<MainScreen>
 
   Future<void> _loadHoroscopes() async {
     if (_loadingHoroscopes) return;
+    setState(() => _loadingHoroscopes = true);
     
     final today = DateTime.now();
     final dateKey = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     final isEnglish = _isEnglish;
     
     final signs = ['Koç', 'Boğa', 'İkizler', 'Yengeç', 'Aslan', 'Başak', 'Terazi', 'Akrep', 'Yay', 'Oğlak', 'Kova', 'Balık'];
+    final newHoroscopes = <String, String>{};
     
-    // Önce cache'den oku ve göster (hızlı yükleme)
     try {
+      // Single doc per day
       final docRef = _firestore.collection('horoscopes').doc(dateKey);
       final doc = await docRef.get();
 
+      Map<String, dynamic> texts = {};
       Map<String, dynamic> shorts = {};
-      bool needsGeneration = false;
 
       if (doc.exists) {
         final data = doc.data() ?? {};
+        final textKey = isEnglish ? 'texts_en' : 'texts';
         final shortKey = isEnglish ? 'shorts_en' : 'shorts';
+        texts = Map<String, dynamic>.from(data[textKey] ?? {});
         shorts = Map<String, dynamic>.from(data[shortKey] ?? {});
-        
-        // Check if all signs have data
-        for (final sign in signs) {
-          if (shorts[sign] == null || shorts[sign].toString().isEmpty) {
-            needsGeneration = true;
-            break;
-          }
-        }
-      } else {
-        needsGeneration = true;
       }
 
-      // Önce cache'den gelen veriyi göster
-      final cachedHoroscopes = <String, String>{};
       for (final sign in signs) {
-        final shortVal = shorts[sign]?.toString();
-        if (shortVal != null && shortVal.isNotEmpty) {
-          cachedHoroscopes[sign] = shortVal;
-        } else {
-          cachedHoroscopes[sign] = _getDefaultHoroscope(sign);
+        String? shortVal = shorts[sign]?.toString();
+        String? fullVal = texts[sign]?.toString();
+
+        if (shortVal == null || shortVal.isEmpty) {
+          // Need to generate or summarize
+          if (fullVal == null || fullVal.isEmpty) {
+            // AI'ya İngilizce isim gönder, ama cache anahtarı olarak Türkçe ismi kullan
+            final aiSign = isEnglish ? _mapTurkishSignToEnglish(sign) : sign;
+            fullVal = await _aiService.generateDailyHoroscope(
+              zodiacSign: aiSign,
+              date: today,
+              english: isEnglish,
+            );
+          }
+          shortVal = _summarizeShort(fullVal);
+          texts[sign] = fullVal;
+          shorts[sign] = shortVal;
         }
-      }
-      
-      // Cache'den gelen veriyi hemen göster
-      if (mounted && cachedHoroscopes.isNotEmpty) {
-        setState(() {
-          _horoscopes = cachedHoroscopes;
-          _loadingHoroscopes = false;
-        });
+        newHoroscopes[sign] = shortVal;
       }
 
-      // Eğer veri eksikse, arka planda generate et (API tasarrufu)
-      if (needsGeneration) {
-        setState(() => _loadingHoroscopes = true);
-        
-        // Use Firestore transaction to ensure only one user generates
-        try {
-          await _firestore.runTransaction((transaction) async {
-            final freshDoc = await transaction.get(docRef);
-            final freshData = freshDoc.data();
-            final textKey = isEnglish ? 'texts_en' : 'texts';
-            final shortKey = isEnglish ? 'shorts_en' : 'shorts';
-            
-            Map<String, dynamic> freshTexts = {};
-            Map<String, dynamic> freshShorts = {};
-            
-            if (freshData != null) {
-              freshTexts = Map<String, dynamic>.from(freshData[textKey] ?? {});
-              freshShorts = Map<String, dynamic>.from(freshData[shortKey] ?? {});
-            }
-            
-            // Check if still needs generation
-            bool stillNeedsGen = false;
-            for (final sign in signs) {
-              if (freshShorts[sign] == null || freshShorts[sign].toString().isEmpty) {
-                stillNeedsGen = true;
-                break;
-              }
-            }
-            
-            if (stillNeedsGen) {
-              // Generate missing horoscopes
-              for (final sign in signs) {
-                if (freshShorts[sign] == null || freshShorts[sign].toString().isEmpty) {
-                  final aiSign = isEnglish ? _mapTurkishSignToEnglish(sign) : sign;
-                  final fullVal = await _aiService.generateDailyHoroscope(
-                    zodiacSign: aiSign,
-                    date: today,
-                    english: isEnglish,
-                  );
-                  final shortVal = _summarizeShort(fullVal);
-                  freshTexts[sign] = fullVal;
-                  freshShorts[sign] = shortVal;
-                }
-              }
-              
-              // Update Firestore
-              transaction.set(docRef, {
-                'date': dateKey,
-                textKey: freshTexts,
-                shortKey: freshShorts,
-                'createdAt': FieldValue.serverTimestamp(),
-                'updatedAt': FieldValue.serverTimestamp(),
-              }, SetOptions(merge: true));
-            }
-            
-            shorts = freshShorts;
-          });
-          
-          // Generate edilen veriyi güncelle
-          final updatedHoroscopes = <String, String>{};
-          for (final sign in signs) {
-            final shortVal = shorts[sign]?.toString();
-            if (shortVal != null && shortVal.isNotEmpty) {
-              updatedHoroscopes[sign] = shortVal;
-            } else {
-              updatedHoroscopes[sign] = _getDefaultHoroscope(sign);
-            }
-          }
-          
-          if (mounted) {
-            setState(() {
-              _horoscopes = updatedHoroscopes;
-              _loadingHoroscopes = false;
-            });
-          }
-        } catch (e) {
-          // If transaction fails, keep cached data
-          if (mounted) {
-            setState(() {
-              _loadingHoroscopes = false;
-            });
-          }
-        }
-      }
+      final textKey = isEnglish ? 'texts_en' : 'texts';
+      final shortKey = isEnglish ? 'shorts_en' : 'shorts';
+      await docRef.set({
+        'date': dateKey,
+        textKey: texts,
+        shortKey: shorts,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (e) {
-      // Fallback
-      final fallbackHoroscopes = <String, String>{};
       for (final sign in signs) {
-        fallbackHoroscopes[sign] = _getDefaultHoroscope(sign);
+        newHoroscopes[sign] = _getDefaultHoroscope(sign);
       }
-      if (mounted) {
-        setState(() {
-          _horoscopes = fallbackHoroscopes;
-          _loadingHoroscopes = false;
-        });
-      }
+    }
+    
+    if (mounted) {
+      setState(() {
+        _horoscopes = newHoroscopes;
+        _loadingHoroscopes = false;
+      });
     }
   }
   
@@ -562,42 +447,39 @@ class _MainScreenState extends State<MainScreen>
     _pageController.jumpToPage(index);
   }
 
-  // Key for background capture shader
-  final GlobalKey _backgroundKey = GlobalKey();
-
   @override
   Widget build(BuildContext context) {
-    // Listen to LanguageProvider to trigger rebuilds on language change
-    Provider.of<LanguageProvider>(context);
-
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return Scaffold(
-          extendBody: true,
-          body: Stack(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  gradient: themeProvider.backgroundGradient,
-                ),
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _selectedIndex = index;
-                    });
+          extendBody: true, // Required for transparent navbar effects
+          body: RepaintBoundary(
+            key: _backgroundKey,
+            child: Stack(
+              children: [
+                Container(
+            decoration: BoxDecoration(
+              gradient: themeProvider.backgroundGradient,
+            ),
+        child: PageView(
+          controller: _pageController,
+          onPageChanged: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+                    // Reload quests when returning to home tab
                     if (index == 0) {
                       _loadQuests();
                     }
-                  },
-                  children: [
-                    _buildHomeTab(),
-                    _buildFortunesHistoryTab(),
-                    const TestsScreen(),
-                    const SocialScreen(),
-                    const ProfileScreen(),
-                  ],
-                ),
+          },
+          children: [
+            _buildHomeTab(),
+            _buildFortunesHistoryTab(),
+            const TestsScreen(),
+            const SocialScreen(),
+            const ProfileScreen(),
+          ],
+        ),
               ),
               if (_showConfetti)
                 ConfettiAnimation(
@@ -607,18 +489,11 @@ class _MainScreenState extends State<MainScreen>
                     });
                   },
                 ),
-              LiquidGlassNavbar(
-                currentIndex: _selectedIndex,
-                onTap: _onBottomNavTap,
-                items: [
-                  const NavbarItem(icon: Icons.home_rounded, label: 'Ana Sayfa'),
-                  const NavbarItem(icon: Icons.history_rounded, label: 'Geçmiş'),
-                  const NavbarItem(icon: Icons.quiz_rounded, label: 'Testler'),
-                  const NavbarItem(icon: Icons.favorite_rounded, label: 'Sosyal'),
-                  const NavbarItem(icon: Icons.person_rounded, label: 'Profil'),
-                ],
-              ),
-            ],
+
+                // Navbar is now part of the body stack to support Positioned widget
+                _buildBottomNavigationBar(),
+              ],
+            ),
           ),
         );
       },
@@ -640,58 +515,41 @@ class _MainScreenState extends State<MainScreen>
     });
     
     return SafeArea(
-      child: CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _buildHeader(),
-                const SizedBox(height: 16),
-                if (_showDailyReward) ...[
-                  _buildDailyRewardCard(),
-                  const SizedBox(height: 16),
-                ],
-                _buildQuestsCard(),
-                const SizedBox(height: 16),
-                _buildWelcomeCard(),
-                const SizedBox(height: 24),
-                _FalGridHome(onNavigate: _handleDeepNavigation),
-                const SizedBox(height: 12),
-              ]),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  switch (index) {
-                    case 0: return const SizedBox(height: 24);
-                    case 1: return _buildHoroscopeSection();
-                    case 2: return const SizedBox(height: 32);
-                    case 3: return _buildLoveCompatibilitySection();
-                    case 4: return const SizedBox(height: 32);
-                    case 5: return _buildDreamSection();
-                    case 6: return const SizedBox(height: 32);
-                    case 7: return _buildBiorhythmSection();
-                    case 8: return const SizedBox(height: 32);
-                    case 9: return _buildKarmaSection();
-                    case 10: return const SizedBox(height: 32);
-                    case 11: return _buildOtherFeatures();
-                    case 12: return const SizedBox(height: 24);
-                    case 13: return const BannerAdWidget(margin: EdgeInsets.symmetric(vertical: 8));
-                    case 14: return const SizedBox(height: 100);
-                    default: return null;
-                  }
-                },
-                childCount: 15,
-                addAutomaticKeepAlives: false, // Critical for memory: destroy off-screen items
-                addRepaintBoundaries: true,
-              ),
-            ),
-          ),
-        ],
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 16),
+            if (_showDailyReward) ...[
+              _buildDailyRewardCard(),
+              const SizedBox(height: 16),
+            ],
+            _buildQuestsCard(),
+            const SizedBox(height: 16),
+            _buildWelcomeCard(),
+            const SizedBox(height: 24),
+            _FalGridHome(),
+            const SizedBox(height: 12),
+            _showResultsCard(),
+          const SizedBox(height: 24),
+          _buildHoroscopeSection(),
+            const SizedBox(height: 32),
+            _buildLoveCompatibilitySection(),
+            const SizedBox(height: 32),
+            _buildTestsSection(),
+            const SizedBox(height: 32),
+            _buildDreamSection(),
+            const SizedBox(height: 32),
+            _buildBiorhythmSection(),
+            const SizedBox(height: 32),
+            _buildKarmaSection(),
+            const SizedBox(height: 32),
+            _buildOtherFeatures(),
+            const SizedBox(height: 100), // Bottom padding for navigation
+          ],
+        ),
       ),
     );
   }
@@ -699,102 +557,86 @@ class _MainScreenState extends State<MainScreen>
   Widget _buildHeader() {
     return Consumer2<UserProvider, ThemeProvider>(
       builder: (context, userProvider, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        final textColor = isDark ? Colors.white : Colors.grey[900]!;
+        final textSecondaryColor = isDark ? Colors.white70 : Colors.grey[700]!;
+        
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(
               child: Row(
-                children: [
-                  Image.asset(
-                    'assets/icons/fallalogo.png',
-                    width: 36,
-                    height: 36,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          userProvider.user?.name ?? AppStrings.welcome,
-                          style: TextStyle(
-                            fontFamily: 'SF Pro Display',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.getTextPrimary(themeProvider.isDarkMode),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          userProvider.user?.name != null 
-                              ? AppStrings.welcomeBack 
-                              : AppStrings.guest,
-                          style: TextStyle(
-                            fontFamily: 'SF Pro Text',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w400,
-                            color: AppColors.getTextSecondary(themeProvider.isDarkMode),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          const SizedBox(width: 12),
-            Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                _buildKarmaDisplay(userProvider.user?.karma ?? 0),
-                const SizedBox(width: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const PremiumScreen(),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.white.withValues(alpha: 0.12),
-                              Colors.white.withValues(alpha: 0.06),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            width: 1,
-                          ),
+                Image.asset(
+                  'assets/icons/premium_logo.png',
+                  height: 85,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+                const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        userProvider.user?.name ?? AppStrings.welcome,
+                        style: AppTextStyles.headingLarge.copyWith(
+                          color: textColor,
                         ),
-                        child: Icon(
-                          Icons.diamond_outlined,
-                          color: AppColors.champagneGold,
-                          size: 22,
-                        ),
+                        maxLines: 1,
                       ),
                     ),
-                  ),
+                const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        userProvider.user?.name != null 
+                            ? AppStrings.welcomeBack 
+                            : AppStrings.guest,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: textSecondaryColor,
+                        ),
+                        maxLines: 1,
+                      ),
+                    ),
+                  ],
+                    ),
                 ),
               ],
+            ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+              children: [
+                  Flexible(
+                    child: _buildKarmaDisplay(userProvider.user?.karma ?? 0),
+                  ),
+                  const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PremiumScreen(),
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    Icons.diamond,
+                    color: AppColors.premium,
+                    size: 28,
+                  ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                ),
+              ],
+              ),
             ),
           ],
         );
@@ -839,135 +681,184 @@ class _MainScreenState extends State<MainScreen>
           ),
         );
       },
-      child: ClipRRect(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: AppColors.karmaGradient,
         borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              gradient: AppColors.champagneGoldGradient,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.champagneGold.withValues(alpha: 0.35),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 22,
-                  width: 22,
-                  child: Image.asset('assets/karma/karma.png', fit: BoxFit.contain),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  karma.toString(),
-                  style: TextStyle(
-                    fontFamily: 'SF Pro Display',
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.premiumDarkBg,
-                  ),
-                ),
-              ],
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.karma.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+              height: 24,
+              width: 24,
+            child: Image.asset('assets/karma/karma.png', fit: BoxFit.contain),
+          ),
+          const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+            karma.toString(),
+                style: AppTextStyles.karmaDisplay.copyWith(fontSize: 16),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+          ),
+        ],
         ),
       ),
     );
   }
 
   Widget _buildDailyRewardCard() {
-    if (!_showDailyReward) return const SizedBox();
+    if (!_showDailyReward) {
+      return const SizedBox.shrink();
+    }
 
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        final textColor = AppColors.getTextPrimary(isDark);
+        final textSecondaryColor = AppColors.getTextSecondary(isDark);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: isDark 
-                  ? LinearGradient(
-                      colors: [
-                        const Color(0xFFFFD700).withValues(alpha: 0.15),
-                        const Color(0xFFFFA500).withValues(alpha: 0.05),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : LinearGradient(
-                      colors: [
-                        AppColors.champagneGold.withOpacity(0.2),
-                        AppColors.champagneGold.withOpacity(0.1),
-                      ],
-                    ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark ? const Color(0xFFFFD700).withValues(alpha: 0.3) : AppColors.champagneGold.withOpacity(0.5),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.champagneGold.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text('🎁', style: TextStyle(fontSize: 24)),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppStrings.dailyGift,
-                        style: TextStyle(
-                          fontSize: 16, 
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.getTextPrimary(isDark),
-                        ),
-                      ),
-                      Text(
-                        AppStrings.dailyGiftDesc,
-                        style: TextStyle(
-                          fontSize: 13, 
-                          color: AppColors.getTextSecondary(isDark),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: _claimDailyReward,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.champagneGold,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(AppStrings.claim),
-                ),
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary.withValues(alpha: 0.2),
+                AppColors.accent.withValues(alpha: 0.15),
               ],
             ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                blurRadius: 20,
+                spreadRadius: 2,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ),
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppStrings.dailyAuraReward,
+                          style: AppTextStyles.headingMedium.copyWith(
+                            color: textColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Bugün +$_todayKarmaReward karma seni bekliyor. Serini bozmamak için hemen al!',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: textSecondaryColor,
+                          ),
+                        ),
+                        if (_currentStreak > 0) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.error.withValues(alpha: 0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: AppColors.error,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    AppStrings.streakWillReset.replaceAll('{0}', '$_currentStreak'),
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.error,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.karmaGradient,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          '🔥',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          AppStrings.dayStreak.replaceAll('{0}', '$_currentStreak'),
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: MysticalButton.primary(
+                  text: AppStrings.claimMyReward,
+                  onPressed: _claimDailyReward,
+                  icon: Icons.card_giftcard,
+                  showGlow: true,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1028,209 +919,413 @@ class _MainScreenState extends State<MainScreen>
   }
 
   Widget _buildQuestsCard() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        
+        // Masterpiece Colors
+        final cardBg = isDark 
+            ? const Color(0xFF151520).withValues(alpha: 0.6) 
+            : const Color(0xFFFFFFF).withValues(alpha: 0.65);
+            
+        final borderColor = isDark
+            ? Colors.white.withValues(alpha: 0.1)
+            : Colors.black.withValues(alpha: 0.05);
 
-    return Container(
-      margin: const EdgeInsets.only(top: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            AppStrings.dailyQuests,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.getTextPrimary(isDark),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 2, // Örnek görevler
-            separatorBuilder: (context, index) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey.withOpacity(0.2),
+        final allQuests = PricingConstants.dailyQuests;
+        final completedCount = _completedQuests.length;
+        final totalQuests = allQuests.length;
+        final allCompleted = completedCount == totalQuests;
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: borderColor, width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark ? Colors.black.withValues(alpha: 0.4) : const Color(0xFF6366F1).withValues(alpha: 0.08),
+                    blurRadius: 30,
+                    offset: const Offset(0, 15),
+                    spreadRadius: -5,
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      index == 0 ? Icons.coffee_rounded : Icons.star_rounded,
-                      color: AppColors.champagneGold, 
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                         _questsExpanded = !_questsExpanded;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                      child: Row(
                         children: [
-                          Text(
-                            index == 0 ? 'Bugün bir Kahve Falı baktır' : '5 yıldız ver',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.getTextPrimary(isDark),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF6366F1).withValues(alpha: 0.2) : const Color(0xFF6366F1).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.verified_user_outlined,
+                              size: 20,
+                              color: isDark ? const Color(0xFFA5A6F6) : const Color(0xFF6366F1),
                             ),
                           ),
-                          Text(
-                            '+50 Karma',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.champagneGold,
-                              fontWeight: FontWeight.bold,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppStrings.todaysQuests,
+                                  style: AppTextStyles.headingSmall.copyWith(
+                                    color: isDark ? Colors.white : const Color(0xFF1F2937),
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.5,
+                                    fontSize: 17,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  allCompleted 
+                                    ? "Tüm görevler tamamlandı!" 
+                                    : "${totalQuests - completedCount} görev seni bekliyor",
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.5),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          AnimatedRotation(
+                            turns: _questsExpanded ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOutBack,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
+                              ),
+                              child: Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: isDark ? Colors.white70 : Colors.black54,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: isDark ? Colors.white30 : Colors.black26,
+                  ),
+                  
+                  // Divider
+                  if (_questsExpanded)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Divider(height: 1, color: borderColor),
                     ),
-                  ],
-                ),
-              );
-            },
+
+                  // Content
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeOutCubic, // Daha akıcı, titreşimsiz curve
+                    alignment: Alignment.topCenter, // Yukarıdan aşağı düzgün açılma
+                    child: _questsExpanded
+                        ? Padding(
+                            padding: const EdgeInsets.only(left: 20, right: 20, bottom: 20), // Top padding removed to prevent jump
+                            child: Column(
+                              children: [
+                                const SizedBox(height: 10), // Add spacing here instead
+                                ...allQuests.map((quest) {
+                                  final questId = quest['id'] as String;
+                                  final isCompleted = _completedQuests.contains(questId);
+                                  
+                                  // Get icon asset path
+                                  String iconAsset;
+                                  switch (questId) {
+                                    case 'coffee_fortune':
+                                      iconAsset = 'assets/quest_icons/coffee.png';
+                                      break;
+                                    case 'love_test':
+                                      iconAsset = 'assets/quest_icons/love.png';
+                                      break;
+                                    case 'aura_match':
+                                      iconAsset = 'assets/quest_icons/aura.png';
+                                      break;
+                                    default:
+                                      iconAsset = 'assets/quest_icons/coffee.png';
+                                  }
+
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: isCompleted
+                                          ? (isDark ? const Color(0xFF6366F1).withValues(alpha: 0.15) : const Color(0xFF6366F1).withValues(alpha: 0.08))
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isCompleted
+                                            ? (isDark ? const Color(0xFF6366F1).withValues(alpha: 0.3) : const Color(0xFF6366F1).withValues(alpha: 0.2))
+                                            : Colors.transparent,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Image.asset(
+                                          iconAsset,
+                                          width: 40,
+                                          height: 40,
+                                        ),
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: Text(
+                                              // Mapping logic duplicated here for safety or use helper
+                                              questId == 'coffee_fortune' ? AppStrings.questCoffeeFortuneTitle :
+                                              questId == 'love_test' ? AppStrings.questLoveTestTitle :
+                                              questId == 'aura_match' ? AppStrings.questAuraMatchTitle : '',
+                                            style: TextStyle(
+                                              fontWeight: isCompleted ? FontWeight.w600 : FontWeight.w500,
+                                              decoration: isCompleted ? TextDecoration.lineThrough : null,
+                                              decorationColor: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.4),
+                                              color: isCompleted ? (isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.5)) : (isDark ? Colors.white : Colors.black87),
+                                            ),
+                                          ),
+                                        ),
+                                        if (isCompleted)
+                                          const Icon(Icons.check_circle, color: Color(0xFF6366F1), size: 24)
+                                        else
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+                                              borderRadius: BorderRadius.circular(20),
+                                              boxShadow: [
+                                                BoxShadow(color: const Color(0xFFF59E0B).withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))
+                                              ]
+                                            ),
+                                            child: Text(
+                                              "+${quest['karma']}",
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildWelcomeCard() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
-    
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 600),
-      tween: Tween(begin: 0.0, end: 1.0),
-      curve: Curves.easeOutQuart,
-      builder: (context, value, child) {
-        return Transform.translate(
-          offset: Offset(0, (1 - value) * 30),
-          child: Opacity(
-            opacity: value.clamp(0.0, 1.0),
-            child: RepaintBoundary(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: themeProvider.isDarkMode 
-                        ? AppColors.premiumHeroCardDecoration
-                        : AppColors.ios26LightSelectedCardDecoration,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    AppColors.champagneGold.withValues(alpha: 0.3),
-                                    AppColors.subtleBronze.withValues(alpha: 0.15),
-                                  ],
-                                ),
-                                border: Border.all(
-                                  color: AppColors.champagneGold.withValues(alpha: 0.5),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  Icons.auto_awesome,
-                                  size: 24,
-                                  color: AppColors.champagneGold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    AppStrings.dailyFortune,
-                                    style: TextStyle(
-                                      fontFamily: 'SF Pro Display',
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.getTextPrimary(isDark),
-                                    ),
-                                  ),
-                                  if (!_isFortuneExpanded)
-                                  Text(
-                                    AppStrings.tapToSeeDetails,
-                                    style: TextStyle(
-                                      fontFamily: 'SF Pro Text',
-                                      fontSize: 13,
-                                      color: AppColors.getTextSecondary(isDark),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  _isFortuneExpanded = !_isFortuneExpanded;
-                                });
-                              },
-                              icon: Icon(
-                                _isFortuneExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                                color: AppColors.getTextSecondary(isDark),
-                              ),
-                            ),
-                          ],
-                        ),
-                        
-                        if (_isFortuneExpanded) ...[
-                          const SizedBox(height: 16),
-                          Text(
-                            AppStrings.dailyFortuneDesc,
-                            style: TextStyle(
-                              fontFamily: 'SF Pro Text',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.getTextSecondary(isDark),
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          _GlassCTAButton(
-                            text: AppStrings.startFortune,
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const FortuneSelectionScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ],
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        
+        // Masterpiece Daily Fortune Colors
+        // Dark: Mystic Deep Blue/Purple gradient
+        // Light: Soft Ethereal Pink/Gold
+        
+        final gradientColors = isDark 
+            ? [const Color(0xFF2A2A72), const Color(0xFF009FFD)] // Dark space vibe
+            : [const Color(0xFFFFF0F5), const Color(0xFFE6E6FA)]; // Light fairy vibe
+
+        final shadowColor = isDark 
+            ? const Color(0xFF009FFD).withValues(alpha: 0.25)
+            : const Color(0xFFE6E6FA).withValues(alpha: 0.3);
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            children: [
+              // 1. Background with blur
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark 
+                        ? [Colors.black.withValues(alpha: 0.6), Colors.black.withValues(alpha: 0.4)]
+                        : [Colors.white.withValues(alpha: 0.8), Colors.white.withValues(alpha: 0.6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
                 ),
               ),
-            ),
+              
+              // 2. Artistic Mesh Gradients / Glows (Orb effects)
+              Positioned(
+                top: -30,
+                right: -30,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDark ? const Color(0xFF9D4EDD).withValues(alpha: 0.3) : const Color(0xFFFFD700).withValues(alpha: 0.2),
+                    boxShadow: [
+                      BoxShadow(color: isDark ? const Color(0xFF9D4EDD).withValues(alpha: 0.4) : const Color(0xFFFFD700).withValues(alpha: 0.3), blurRadius: 40, spreadRadius: 10)
+                    ]
+                  ),
+                ),
+              ),
+              
+              // 3. Main Content
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.5),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    )
+                  ]
+                ),
+                child: Column(
+                  children: [
+                    // Floating Icon with Glow
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.9),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark ? const Color(0xFF009FFD).withValues(alpha: 0.4) : const Color(0xFFFFD700).withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          )
+                        ]
+                      ),
+                      child: Image.asset(
+                        'assets/quest_icons/aura.png', // Kesin çalışan path
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                           Icons.auto_awesome, 
+                           size: 40,
+                           color: isDark ? const Color(0xFF009FFD) : const Color(0xFFFFD700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Titles
+                    Text(
+                      AppStrings.dailyFortune,
+                      style: AppTextStyles.headingMedium.copyWith(
+                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        fontSize: 26,
+                        shadows: isDark ? [
+                          BoxShadow(color: Colors.white.withValues(alpha: 0.2), blurRadius: 10)
+                        ] : null,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      AppStrings.dailyFortuneDesc,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    
+                    // Cinematic Button
+                    Container(
+                      width: double.infinity,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: LinearGradient(
+                          colors: isDark 
+                              ? [const Color(0xFF4338CA), const Color(0xFF6366F1)] // Indigo gradient
+                              : [const Color(0xFF1E293B), const Color(0xFF334155)], // Slate gradient
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark ? const Color(0xFF4338CA).withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 16,
+                            offset: const Offset(0, 8),
+                            spreadRadius: -2,
+                          )
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                             Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const FortuneSelectionScreen(),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  AppStrings.startFortune.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -1242,108 +1337,296 @@ class _MainScreenState extends State<MainScreen>
 
   // Removed legacy fortune type card
 
+
+
   Widget _buildDreamSection() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          AppStrings.dreamArea,
-          style: TextStyle(
-            fontFamily: 'SF Pro Display',
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: AppColors.getTextPrimary(themeProvider.isDarkMode),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        final textColor = AppColors.getTextPrimary(isDark);
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: _buildGlassDreamCard(
-                title: AppStrings.isEnglish ? 'Dream Dictionary' : 'Rüya Sözlüğü',
-                icon: Icons.menu_book_outlined,
-                iconColor: AppColors.champagneGold,
-                onTap: () => Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => const DreamDictionaryScreen(),
-                )),
+            Text(
+              AppStrings.dreamArea,
+              style: AppTextStyles.headingMedium.copyWith(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildGlassDreamCard(
-                title: AppStrings.drawMyDream,
-                icon: Icons.brush_outlined,
-                iconColor: AppColors.subtleBronze,
-                onTap: () => Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => const DreamDrawScreen(),
-                )),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDreamCard(
+                    title: AppStrings.isEnglish ? 'Dream Dictionary' : 'Rüya Sözlüğü',
+                    icon: Icons.menu_book_rounded,
+                    gradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFDB931)]), // Gold
+                    iconColor: const Color(0xFFFDB931),
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const DreamDictionaryScreen()));
+                    },
+                    delay: 0,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildDreamCard(
+                    title: AppStrings.drawMyDream,
+                    icon: Icons.brush_rounded,
+                    gradient: const LinearGradient(colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)]), // Purple
+                    iconColor: const Color(0xFF8E2DE2),
+                    isDark: isDark,
+                    onTap: () {
+                       Navigator.push(context, MaterialPageRoute(builder: (context) => const DreamDrawScreen()));
+                    },
+                    delay: 1,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildDreamCard(
+                    title: AppStrings.interpretDream,
+                    icon: Icons.auto_awesome_rounded,
+                    gradient: const LinearGradient(colors: [Color(0xFF11998E), Color(0xFF38EF7D)]), // Emerald
+                    iconColor: const Color(0xFF11998E),
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const DreamInterpretationScreen()));
+                    },
+                    delay: 2,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+  Widget _buildDreamCard({
+    required String title,
+    required IconData icon,
+    required Gradient gradient,
+    required Color iconColor,
+    required bool isDark,
+    required VoidCallback onTap,
+    required int delay,
+  }) {
+    // 0xFF1E1B2E is a deep mystic purple/black color
+    final baseColor = iconColor; 
+    
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Stack(
+        children: [
+          // Glass Background with Full Atmosphere
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              height: 140,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                // Color spread everywhere
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isDark 
+                      ? [
+                          baseColor.withValues(alpha: 0.2), 
+                          Colors.black.withValues(alpha: 0.6)
+                        ]
+                      : [
+                          Colors.white.withValues(alpha: 0.4),
+                          baseColor.withValues(alpha: 0.2)
+                        ],
+                ),
+                border: Border.all(
+                  color: isDark 
+                      ? baseColor.withValues(alpha: 0.2) 
+                      : Colors.white.withValues(alpha: 0.6),
+                  width: 1.5,
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildGlassDreamCard(
-                title: AppStrings.interpretDream,
-                icon: Icons.auto_awesome_outlined,
-                iconColor: themeProvider.isDarkMode ? AppColors.warmIvory : AppColors.getTextPrimary(false),
-                onTap: () => Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => const DreamInterpretationScreen(),
-                )),
+          ),
+          
+          // No explicit "orb" 
+
+          // Content
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(20),
+              splashColor: baseColor.withValues(alpha: 0.3),
+              highlightColor: baseColor.withValues(alpha: 0.15),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                height: 140,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.5),
+                        boxShadow: [
+                           BoxShadow(
+                             color: baseColor.withValues(alpha: 0.3),
+                             blurRadius: 15,
+                             spreadRadius: 2,
+                           )
+                        ]
+                      ),
+                      child: Icon(icon, color: iconColor, size: 28),
+                    ),
+                    const Spacer(),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        height: 1.2,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  ],
+                ),
+              ),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+
+  String _getZodiacSignName(String signCode) {
+    if (!_isEnglish) return signCode;
+    final lower = signCode.toLowerCase();
+    if (lower.contains('koç') || lower.contains('koc')) return AppStrings.aries;
+    if (lower.contains('boğa') || lower.contains('boga')) return AppStrings.taurus;
+    if (lower.contains('ikiz')) return AppStrings.gemini;
+    if (lower.contains('yengeç') || lower.contains('yengec')) return AppStrings.cancer;
+    if (lower.contains('aslan')) return AppStrings.leo;
+    if (lower.contains('başak') || lower.contains('basak')) return AppStrings.virgo;
+    if (lower.contains('terazi')) return AppStrings.libra;
+    if (lower.contains('akrep')) return AppStrings.scorpio;
+    if (lower.contains('yay')) return AppStrings.sagittarius;
+    if (lower.contains('oğlak') || lower.contains('oglak')) return AppStrings.capricorn;
+    if (lower.contains('kova')) return AppStrings.aquarius;
+    if (lower.contains('balık') || lower.contains('balik')) return AppStrings.pisces;
+    return signCode;
+  }
+
+  Widget _buildGlassActionChip(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [
+                    color.withValues(alpha: 0.2),
+                    Colors.black.withValues(alpha: 0.4),
+                  ]
+                : [
+                    Colors.white.withValues(alpha: 0.6),
+                    color.withValues(alpha: 0.1),
+                  ],
+          ),
+          border: Border.all(
+            color: color.withValues(alpha: 0.3),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withValues(alpha: 0.15),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.grey[900],
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
               ),
             ),
           ],
         ),
-      ],
-    );
-  }
-
-  Widget _buildGlassDreamCard({
-    required String title,
-    required IconData icon,
-    required Color iconColor,
-    required VoidCallback onTap,
-  }) {
-    return _GlassFeatureCard(
-      title: title,
-      icon: icon,
-      iconColor: iconColor,
-      onTap: onTap,
+      ),
     );
   }
 
   Widget _buildLoveCompatibilitySection() {
     return Consumer2<ThemeProvider, UserProvider>(
       builder: (context, themeProvider, userProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        final textColor = isDark ? Colors.white : Colors.grey[900]!;
+        final textSecondaryColor = isDark ? Colors.white70 : Colors.grey[700]!;
+        
+        // Base Color for Love Section (Pink/Rose)
+        final baseColor = const Color(0xFFE91E63);
+        
         if (_loadingLoveCandidates) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.12) : AppColors.premiumLightSurface.withValues(alpha: 0.9),
-                      themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.05) : AppColors.premiumLightSurface.withValues(alpha: 0.5),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: const Color(0xFFFF6B9D).withValues(alpha: 0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: Center(
-                  child: MysticalLoading(
-                    type: MysticalLoadingType.spinner,
-                    size: 32,
-                    color: const Color(0xFFFF6B9D),
-                  ),
-                ),
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: baseColor.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Center(
+              child: MysticalLoading(
+                type: MysticalLoadingType.spinner,
+                size: 32,
+                color: baseColor,
               ),
             ),
           );
@@ -1352,84 +1635,633 @@ class _MainScreenState extends State<MainScreen>
         final hasCandidates = _loveCandidates.isNotEmpty;
         final firstCandidate = hasCandidates ? _loveCandidates.first : null;
         
-        return RepaintBoundary(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.14) : AppColors.premiumLightSurface,
-                      themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.06) : AppColors.premiumLightSurface.withValues(alpha: 0.9),
-                      themeProvider.isDarkMode ? const Color(0xFFFF6B9D).withValues(alpha: 0.08) : AppColors.premiumLightSurface.withValues(alpha: 0.8),
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              // Atmospheric Glass Background
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark 
+                          ? [
+                              baseColor.withValues(alpha: 0.25),
+                              Colors.black.withValues(alpha: 0.6),
+                            ]
+                          : [
+                              Colors.white.withValues(alpha: 0.8),
+                              baseColor.withValues(alpha: 0.15),
+                            ],
+                    ),
+                    border: Border.all(
+                      color: isDark 
+                          ? baseColor.withValues(alpha: 0.2) 
+                          : Colors.white.withValues(alpha: 0.6),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: baseColor.withValues(alpha: 0.15),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
                     ],
-                    stops: const [0.0, 0.5, 1.0],
                   ),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    width: 1.5,
-                    color: LinearGradient(
-                      colors: [
-                        Colors.white.withValues(alpha: 0.4),
-                        const Color(0xFFFF6B9D).withValues(alpha: 0.3),
-                      ],
-                    ).colors.first,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFF6B9D).withValues(alpha: 0.15),
-                      blurRadius: 30,
-                      spreadRadius: -5,
-                      offset: const Offset(0, 10),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
-                      child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
+                          // Floating Glass Icon Container
                           Container(
-                            width: 52,
-                            height: 52,
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
                               gradient: LinearGradient(
+                                colors: [
+                                  baseColor.withValues(alpha: 0.3),
+                                  baseColor.withValues(alpha: 0.1),
+                                ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
-                                colors: [
-                                  const Color(0xFFFF6B9D).withValues(alpha: 0.25),
-                                  const Color(0xFFFF8FB1).withValues(alpha: 0.15),
-                                ],
                               ),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: const Color(0xFFFF6B9D).withValues(alpha: 0.4),
-                                width: 1.5,
+                                color: baseColor.withValues(alpha: 0.3),
+                                width: 1,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFFF6B9D).withValues(alpha: 0.3),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
+                                  color: baseColor.withValues(alpha: 0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
-                            child: const Center(
-                              child: Text(
-                                '💕',
-                                style: TextStyle(fontSize: 24),
+                            child: Icon(
+                              Icons.favorite_rounded,
+                              color: isDark ? const Color(0xFFFF80AB) : baseColor,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppStrings.loveCompatibility,
+                                  style: AppTextStyles.headingSmall.copyWith(
+                                    color: textColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  AppStrings.calculateHarmony,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: textSecondaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      if (hasCandidates && firstCandidate != null) ...[
+                        // Premium Glass Candidate Card
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark 
+                                ? Colors.black.withValues(alpha: 0.3) 
+                                : Colors.white.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: baseColor.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: baseColor.withValues(alpha: 0.2),
+                                child: Text(
+                                  firstCandidate.name[0].toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 20, 
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? const Color(0xFFFF80AB) : baseColor,
+                                  ),
+                                ),
                               ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      firstCandidate.name,
+                                      style: AppTextStyles.bodyLarge.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    Text(
+                                      _getZodiacSignName(firstCandidate.zodiacSign),
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: textSecondaryColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (firstCandidate.lastCompatibilityScore != null) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    gradient: AppColors.karmaGradient,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary.withValues(alpha: 0.3),
+                                        blurRadius: 8,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    '${firstCandidate.lastCompatibilityScore!.toStringAsFixed(0)}%',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ] else ...[
+                        Text(
+                          AppStrings.noLoveCandidate,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: textSecondaryColor,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildGlassActionChip(
+                              context,
+                              label: AppStrings.isEnglish ? 'Add New' : 'Yeni Ekle',
+                              icon: Icons.add_rounded,
+                              color: const Color(0xFFE91E63), // Pink
+                              isDark: isDark,
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const LoveCandidateFormScreen(),
+                                  ),
+                                );
+                                _loadLoveCandidates();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildGlassActionChip(
+                              context,
+                              label: AppStrings.isEnglish ? 'Candidates' : 'Adaylar',
+                              icon: Icons.favorite_border_rounded,
+                              color: const Color(0xFF9C27B0), // Purple
+                              isDark: isDark,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const LoveCandidatesScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Top Glint
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.transparent, Colors.white.withValues(alpha: 0.5), Colors.transparent],
+                    )
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTestsSection() {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        final textColor = AppColors.getTextPrimary(isDark);
+        final textSecondaryColor = AppColors.getTextSecondary(isDark);
+        
+        final quizTestService = QuizTestService();
+        final allTests = quizTestService.getAllTests();
+        
+        // Popüler testler (test ID'lerine göre - dil bağımsız)
+        final popularTestIds = ['personality', 'friendship', 'love', 'compatibility', 'love_what_you_want'];
+        final popularTests = allTests.where((test) => 
+          popularTestIds.contains(test.id)
+        ).toList();
+        
+        if (popularTests.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    AppStrings.tests,
+                    style: AppTextStyles.headingMedium.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      _onBottomNavTap(2); // Navigate to tests tab
+                    },
+                    child: Text(
+                      AppStrings.seeAllTests,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 180,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: popularTests.length,
+                itemBuilder: (context, index) {
+                  final test = popularTests[index];
+                  return _buildTestCard(test, isDark, textColor, textSecondaryColor);
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String? _getTestGifPath(QuizTestDefinition test) {
+    switch (test.id) {
+      case 'personality':
+        return 'assets/gif/Popüler Testler/Kişilik Testi/kişiliktesti.gif';
+      case 'friendship':
+        return 'assets/gif/Popüler Testler/Arkadaşlık Testi/arkadaşlıktesti.gif';
+      case 'love':
+        return 'assets/gif/Popüler Testler/Aşk Testi/aşktesti.gif';
+      case 'compatibility':
+        return 'assets/gif/Popüler Testler/İlişki Uyum Testi/ilişkiuyumtesti.gif';
+      case 'love_what_you_want':
+        return 'assets/gif/Popüler Testler/İlişkinde Gerçekten Ne İstiyorsun/ilişkindegerçektenneistiyorsun.gif';
+      default:
+        return null;
+    }
+  }
+
+  String _getLocalizedQuizTitle(QuizTestDefinition test) {
+    if (!AppStrings.isEnglish) return test.title;
+    final lower = test.title.toLowerCase();
+    if (lower.contains('kişilik testi')) {
+      return AppStrings.personalityTest;
+    } else if (lower.contains('arkadaşlık testi')) {
+      return AppStrings.friendshipTest;
+    } else if (lower.contains('aşk testi')) {
+      return AppStrings.loveTest;
+    } else if (lower.contains('ilişkinde gerçekten ne istiyorsun')) {
+      return AppStrings.relationshipWhatYouWantTest;
+    }
+    return test.title;
+  }
+
+  String _getLocalizedQuizSubtitle(QuizTestDefinition test) {
+    if (!AppStrings.isEnglish) return test.description;
+    switch (test.id) {
+      case 'personality':
+        return AppStrings.personalityTestSubtitle;
+      case 'friendship':
+        return AppStrings.friendshipTestSubtitle;
+      case 'love':
+        return AppStrings.loveTestSubtitle;
+      case 'compatibility':
+        return AppStrings.relationshipCompatibilitySubtitle;
+      case 'love_what_you_want':
+        return AppStrings.relationshipWhatYouWantSubtitle;
+      default:
+        return test.description;
+    }
+  }
+
+  Widget _buildTestCard(
+    QuizTestDefinition test,
+    bool isDark,
+    Color textColor,
+    Color textSecondaryColor,
+  ) {
+    final gifPath = _getTestGifPath(test);
+    
+    // Dynamic Atmospheric Colors based on Test Type
+    Color baseColor;
+    if (test.id.contains('love')) {
+      baseColor = const Color(0xFFE91E63); // Pink
+    } else if (test.id.contains('personality')) {
+      baseColor = const Color(0xFF9C27B0); // Purple
+    } else if (test.id.contains('friend')) {
+      baseColor = const Color(0xFFFF9800); // Orange
+    } else {
+      baseColor = const Color(0xFF2196F3); // Blue
+    }
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => GeneralTestScreen(testDefinition: test),
+          ),
+        );
+      },
+      child: Container(
+        width: 160,
+        margin: const EdgeInsets.only(right: 12, bottom: 10),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              // Atmospheric Glass Background
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  height: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark 
+                          ? [
+                              baseColor.withValues(alpha: 0.25),
+                              Colors.black.withValues(alpha: 0.6),
+                            ]
+                          : [
+                              Colors.white.withValues(alpha: 0.8),
+                              baseColor.withValues(alpha: 0.15),
+                            ],
+                    ),
+                    border: Border.all(
+                      color: isDark 
+                          ? baseColor.withValues(alpha: 0.2) 
+                          : Colors.white.withValues(alpha: 0.6),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: baseColor.withValues(alpha: 0.15),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      if (gifPath != null)
+                        Expanded(
+                          flex: 3,
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.4),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            child: Image.asset(
+                              gifPath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const SizedBox(),
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        flex: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                _getLocalizedQuizTitle(test),
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: textColor,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.2,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _getLocalizedQuizSubtitle(test),
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: textSecondaryColor,
+                                  fontSize: 10,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Subtle Glow Overlay
+              Positioned(
+                 top: 0,
+                 right: 0,
+                 child: Container(
+                   width: 50,
+                   height: 50,
+                   decoration: BoxDecoration(
+                     shape: BoxShape.circle,
+                     gradient: RadialGradient(
+                       colors: [
+                         baseColor.withValues(alpha: 0.4),
+                         Colors.transparent,
+                       ],
+                     ),
+                   ),
+                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBiorhythmSection() {
+    return Consumer2<UserProvider, ThemeProvider>(
+      builder: (context, userProvider, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        final textColor = isDark ? Colors.white : Colors.grey[900]!;
+        final textSecondaryColor = isDark ? Colors.white70 : Colors.grey[700]!;
+        
+        // Base Color for Biorhythm (Teal)
+        final baseColor = const Color(0xFF009688);
+        
+        final user = userProvider.user;
+        final birthDate = user?.birthDate;
+        
+        // Calculate biorhythm scores
+        Map<String, double> biorhythmScores = {};
+        if (birthDate != null) {
+          final daysSinceBirth = DateTime.now().difference(birthDate).inDays.toDouble();
+          final physical = math.sin(2 * math.pi * daysSinceBirth / 23);
+          final emotional = math.sin(2 * math.pi * daysSinceBirth / 28);
+          final mental = math.sin(2 * math.pi * daysSinceBirth / 33);
+          
+          // Convert -1..1 to 0..100
+          biorhythmScores = {
+            'physical': ((physical + 1) / 2 * 100).clamp(0, 100),
+            'emotional': ((emotional + 1) / 2 * 100).clamp(0, 100),
+            'mental': ((mental + 1) / 2 * 100).clamp(0, 100),
+          };
+        }
+        
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              // Atmospheric Glass Background
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark 
+                          ? [
+                              baseColor.withValues(alpha: 0.25),
+                              Colors.black.withValues(alpha: 0.6),
+                            ]
+                          : [
+                              Colors.white.withValues(alpha: 0.8),
+                              baseColor.withValues(alpha: 0.15),
+                            ],
+                    ),
+                    border: Border.all(
+                      color: isDark 
+                          ? baseColor.withValues(alpha: 0.2) 
+                          : Colors.white.withValues(alpha: 0.6),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: baseColor.withValues(alpha: 0.15),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          // Floating Glass Icon Container
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  baseColor.withValues(alpha: 0.3),
+                                  baseColor.withValues(alpha: 0.1),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(
+                                color: baseColor.withValues(alpha: 0.3),
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: baseColor.withValues(alpha: 0.2),
+                                  blurRadius: 10,
+                                  spreadRadius: 1,
+                                )
+                              ]
+                            ),
+                            child: Icon(
+                              Icons.auto_graph_rounded,
+                              color: isDark ? const Color(0xFF80CBC4) : baseColor, // Light Teal in dark mode
+                              size: 28,
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -1438,22 +2270,19 @@ class _MainScreenState extends State<MainScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  AppStrings.loveCandidate,
-                                  style: TextStyle(
-                                    fontFamily: 'SF Pro Display',
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.getTextPrimary(themeProvider.isDarkMode),
-                                    letterSpacing: -0.3,
+                                  AppStrings.biorhythm,
+                                  style: AppTextStyles.headingSmall.copyWith(
+                                    color: textColor,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  _isEnglish ? 'AI-powered love analysis' : 'Yapay zeka destekli aşk analizi',
-                                  style: TextStyle(
-                                    fontFamily: 'SF Pro Text',
-                                    fontSize: 13,
-                                    color: AppColors.getTextSecondary(themeProvider.isDarkMode),
+                                  AppStrings.isEnglish
+                                      ? 'Discover your daily energy cycles'
+                                      : 'Günlük enerji döngülerini keşfet',
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: textSecondaryColor,
                                   ),
                                 ),
                               ],
@@ -1461,518 +2290,88 @@ class _MainScreenState extends State<MainScreen>
                           ),
                         ],
                       ),
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: hasCandidates && firstCandidate != null
-                          ? _buildLiquidGlassCandidateCard(firstCandidate)
-                          : _buildEmptyCandidateState(),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                      child: Column(
-                        children: [
-                          GestureDetector(
-                            onTap: () async {
-                              await _handleDeepNavigation(const LoveCandidateFormScreen());
-                              _loadLoveCandidates();
+                      const SizedBox(height: 24),
+                      
+                      if (birthDate == null) ...[
+                        // Set Birthday Button (Glass Chip style)
+                        Center(
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context, 
+                                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                              );
                             },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        const Color(0xFFFF6B9D).withValues(alpha: 0.35),
-                                        const Color(0xFFFF8FB1).withValues(alpha: 0.25),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: const Color(0xFFFF6B9D).withValues(alpha: 0.5),
-                                      width: 1.5,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFFFF6B9D).withValues(alpha: 0.25),
-                                        blurRadius: 15,
-                                        offset: const Offset(0, 5),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 28,
-                                        height: 28,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.2),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.add_rounded,
-                                          color: Colors.white,
-                                          size: 18,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Text(
-                                        AppStrings.addNewCandidate,
-                                        style: TextStyle(
-                                          fontFamily: 'SF Pro Display',
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                          letterSpacing: -0.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          
-                          if (hasCandidates) ...[
-                            const SizedBox(height: 12),
-                            GestureDetector(
-                              onTap: () {
-                                _handleDeepNavigation(const LoveCandidatesScreen());
-                              },
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.1) : AppColors.premiumLightTextSecondary.withValues(alpha: 0.3),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      AppStrings.viewAllCandidates,
-                                      style: TextStyle(
-                                        fontFamily: 'SF Pro Text',
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.8) : AppColors.getTextSecondary(false),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Icon(
-                                      Icons.arrow_forward_rounded,
-                                      color: themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.8) : AppColors.getTextSecondary(false),
-                                      size: 16,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-  
-  Widget _buildLiquidGlassCandidateCard(LoveCandidateModel candidate) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => LoveCompatibilityResultScreen(
-              candidate: candidate,
-            ),
-          ),
-        ).then((_) => _loadLoveCandidates());
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.12) : AppColors.premiumLightSurface,
-                  themeProvider.isDarkMode ? const Color(0xFFFF6B9D).withValues(alpha: 0.08) : AppColors.premiumLightSurface.withValues(alpha: 0.9),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFFFF6B9D).withValues(alpha: 0.35),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFF6B9D).withValues(alpha: 0.15),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // Avatar with Liquid Glass effect
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        const Color(0xFFFF6B9D).withValues(alpha: 0.4),
-                        const Color(0xFFFF8FB1).withValues(alpha: 0.25),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      width: 2,
-                    ),
-                    image: candidate.avatarUrl != null
-                        ? DecorationImage(
-                            image: ResizeImage(
-                              NetworkImage(candidate.avatarUrl!),
-                              width: 150,
-                            ),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFF6B9D).withValues(alpha: 0.35),
-                        blurRadius: 12,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: candidate.avatarUrl == null
-                      ? Center(
-                          child: Text(
-                            candidate.name[0].toUpperCase(),
-                            style: const TextStyle(
-                              fontFamily: 'SF Pro Display',
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 16),
-                // Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        candidate.name,
-                        style: TextStyle(
-                          fontFamily: 'SF Pro Display',
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.getTextPrimary(themeProvider.isDarkMode),
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          // Zodiac Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  Helpers.getZodiacEmoji(candidate.zodiacSign),
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  candidate.zodiacSign,
-                                  style: TextStyle(
-                                    fontFamily: 'SF Pro Text',
-                                    fontSize: 12,
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (candidate.lastCompatibilityScore != null) ...[
-                            const SizedBox(width: 8),
-                            // Score Badge with Glow
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                               decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
                                 gradient: LinearGradient(
                                   colors: [
-                                    const Color(0xFFFF6B9D),
-                                    const Color(0xFFFF8FB1),
+                                    baseColor.withValues(alpha: 0.3),
+                                    baseColor.withValues(alpha: 0.1),
                                   ],
                                 ),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFFF6B9D).withValues(alpha: 0.4),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+                                border: Border.all(
+                                  color: baseColor.withValues(alpha: 0.4),
+                                ),
                               ),
                               child: Text(
-                                '${candidate.lastCompatibilityScore!.toStringAsFixed(0)}%',
-                                style: const TextStyle(
-                                  fontFamily: 'SF Pro Display',
-                                  fontSize: 13,
+                                AppStrings.isEnglish ? 'Set Birth Date' : 'Doğum Tarihi Ayarla',
+                                style: TextStyle(
+                                  color: textColor,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
                                 ),
                               ),
                             ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Arrow indicator
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      width: 1,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: Colors.white.withValues(alpha: 0.7),
-                    size: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildEmptyCandidateState() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-              width: 1,
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFFF6B9D).withValues(alpha: 0.15),
-                  border: Border.all(
-                    color: const Color(0xFFFF6B9D).withValues(alpha: 0.25),
-                    width: 1.5,
-                  ),
-                ),
-                child: const Center(
-                  child: Text('💔', style: TextStyle(fontSize: 28)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                AppStrings.noLoveCandidate,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'SF Pro Text',
-                  fontSize: 15,
-                  color: Colors.white.withValues(alpha: 0.6),
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-
-
-
-
-
-
-
-
-
-
-  Widget _buildBiorhythmSection() {
-    return Consumer2<UserProvider, ThemeProvider>(
-      builder: (context, userProvider, themeProvider, child) {
-        final user = userProvider.user;
-        final birthDate = user?.birthDate;
-        
-        // Calculate biorhythm scores
-        Map<String, double> scores = {};
-        if (birthDate != null) {
-          final days = DateTime.now().difference(birthDate).inDays.toDouble();
-          scores = {
-            'physical': ((math.sin(2 * math.pi * days / 23) + 1) / 2 * 100).clamp(0, 100),
-            'emotional': ((math.sin(2 * math.pi * days / 28) + 1) / 2 * 100).clamp(0, 100),
-            'mental': ((math.sin(2 * math.pi * days / 33) + 1) / 2 * 100).clamp(0, 100),
-          };
-        }
-        
-        return LiquidGlassCard(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          borderRadius: 24,
-          glowColor: const Color(0xFF9C27B0), // Purple glow
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.auto_graph, color: Color(0xFFD4C4F0), size: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppStrings.biorhythm,
-                            style: TextStyle(
-                              color: AppColors.getTextPrimary(themeProvider.isDarkMode),
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'SF Pro Display',
-                            ),
-                          ),
-                          Text(
-                            AppStrings.isEnglish ? 'Energy Cycles' : 'Enerji Döngüleri',
-                            style: TextStyle(
-                              color: AppColors.getTextSecondary(themeProvider.isDarkMode),
-                              fontSize: 13,
-                              fontFamily: 'SF Pro Text',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  MysticalButton(
-                    text: AppStrings.details,
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const BiorhythmScreen()),
-                    ),
-                    size: MysticalButtonSize.small,
-                    customColor: const Color(0xFF9C27B0).withOpacity(0.3),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 24),
-              
-              if (birthDate == null) 
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: themeProvider.isDarkMode ? Colors.white.withOpacity(0.05) : AppColors.premiumLightSurface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: themeProvider.isDarkMode ? Colors.white.withOpacity(0.1) : AppColors.premiumLightSurface),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline, color: Color(0xFFD4C4F0)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          AppStrings.selectBirthDateFirst,
-                          style: TextStyle(
-                            color: AppColors.getTextPrimary(themeProvider.isDarkMode),
-                            fontSize: 14,
                           ),
                         ),
-                      ),
+                      ] else ...[
+                        // Modern Glass Progress Bars
+                        _buildGlassBiorhythmBar(
+                          AppStrings.isEnglish ? 'Physical' : 'Fiziksel',
+                          biorhythmScores['physical'] ?? 50,
+                          const Color(0xFFE57373), // Red/Pink
+                          isDark,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildGlassBiorhythmBar(
+                          AppStrings.isEnglish ? 'Emotional' : 'Duygusal',
+                          biorhythmScores['emotional'] ?? 50,
+                          const Color(0xFF64B5F6), // Blue
+                          isDark,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildGlassBiorhythmBar(
+                          AppStrings.isEnglish ? 'Mental' : 'Zihinsel',
+                          biorhythmScores['mental'] ?? 50,
+                          const Color(0xFF81C784), // Green
+                          isDark,
+                        ),
+                      ],
                     ],
                   ),
-                )
-              else 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildCircularIndicator('Physical', scores['physical'] ?? 0, const Color(0xFF4FC3F7), themeProvider.isDarkMode), // Light Blue
-                    _buildCircularIndicator('Emotional', scores['emotional'] ?? 0, const Color(0xFFF48FB1), themeProvider.isDarkMode), // Pink
-                    _buildCircularIndicator('Mental', scores['mental'] ?? 0, const Color(0xFFA5D6A7), themeProvider.isDarkMode), // Green
-                  ],
                 ),
+              ),
+              // Subtle Top Gradient Overlay
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 40,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        baseColor.withValues(alpha: 0.1),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -1980,137 +2379,933 @@ class _MainScreenState extends State<MainScreen>
     );
   }
 
-  Widget _buildCircularIndicator(String label, double score, Color color, bool isDark) {
+  Widget _buildGlassBiorhythmBar(String label, double value, Color color, bool isDark) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Stack(
-          alignment: Alignment.center,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            SizedBox(
-              width: 70,
-              height: 70,
-              child: CircularProgressIndicator(
-                value: score / 100,
-                backgroundColor: color.withValues(alpha: 0.2),
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-                strokeWidth: 6,
-                strokeCap: StrokeCap.round,
+            Text(
+              label,
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.grey[800],
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
               ),
             ),
             Text(
-              '${score.toInt()}%',
+              '${value.toInt()}%',
               style: TextStyle(
-                color: AppColors.getTextPrimary(isDark),
+                color: color,
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 14,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Text(
-          label,
-          style: TextStyle(
-            color: AppColors.getTextSecondary(isDark),
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
+        const SizedBox(height: 8),
+        // Glass Track
+        Container(
+          height: 8,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: value / 100,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                gradient: LinearGradient(
+                  colors: [
+                    color.withValues(alpha: 0.6),
+                    color,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.4),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  )
+                ],
+              ),
+            ),
           ),
         ),
       ],
     );
   }
+
 
 
 
   Widget _buildKarmaSection() {
-    return const SizedBox();
-  }
-
-  Widget _buildGlassInfoRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'SF Pro Text',
-            fontSize: 14,
-            color: Colors.white.withValues(alpha: 0.6),
+    return Consumer2<UserProvider, ThemeProvider>(
+      builder: (context, userProvider, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        final textColor = isDark ? Colors.white : Colors.grey[900]!;
+        final textSecondaryColor = isDark ? Colors.white70 : Colors.grey[700]!;
+        
+        // Base Color for Karma (Amber/Gold)
+        final baseColor = const Color(0xFFFFC107);
+        
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              // Atmospheric Glass Background
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark 
+                          ? [
+                              baseColor.withValues(alpha: 0.15),
+                              Colors.black.withValues(alpha: 0.6),
+                            ]
+                          : [
+                              Colors.white.withValues(alpha: 0.8),
+                              baseColor.withValues(alpha: 0.1),
+                            ],
+                    ),
+                    border: Border.all(
+                      color: isDark 
+                          ? baseColor.withValues(alpha: 0.2) 
+                          : Colors.white.withValues(alpha: 0.6),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: baseColor.withValues(alpha: 0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 90,
+                        width: 90,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: baseColor.withValues(alpha: 0.3),
+                                blurRadius: 30,
+                                spreadRadius: -5,
+                              )
+                            ]
+                          ),
+                          child: Image.asset('assets/karma/karma.png', fit: BoxFit.contain),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        AppStrings.karmaSystem,
+                        style: AppTextStyles.headingSmall.copyWith(
+                          color: textColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: baseColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: baseColor.withValues(alpha: 0.5),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          '${AppStrings.currentKarma}: ${userProvider.user?.karma ?? 0}',
+                          style: AppTextStyles.bodyLarge.copyWith(
+                            color: isDark ? Colors.amber[200] : Colors.amber[900],
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        AppStrings.karmaDesc,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: textSecondaryColor,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Glass Info Container
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark 
+                              ? Colors.black.withValues(alpha: 0.2) 
+                              : Colors.white.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: baseColor.withValues(alpha: 0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.play_circle_filled_rounded,
+                                  size: 20,
+                                  color: baseColor,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  AppStrings.watchAdsToEarn,
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    color: textColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _buildInfoRow(AppStrings.perVideo, '3 ${AppStrings.karma}', textColor, textSecondaryColor),
+                            const SizedBox(height: 8),
+                            _buildInfoRow(AppStrings.dailyLimit, '5 ${_isEnglish ? 'videos' : 'video'} (${_isEnglish ? 'total' : 'toplam'} 15 ${AppStrings.karma})', textColor, textSecondaryColor),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      Column(
+                        children: [
+                          _buildGlassActionChip(
+                            context,
+                            label: AppStrings.buyKarma,
+                            icon: Icons.shopping_bag_outlined,
+                            color: Colors.amber,
+                            isDark: isDark,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const KarmaPurchaseScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _buildGlassActionChip(
+                            context,
+                            label: AppStrings.earnKarma,
+                            icon: Icons.play_arrow_rounded,
+                            color: Colors.orange,
+                            isDark: isDark,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const KarmaPurchaseScreen(
+                                    initialTab: 1, // Kazan sekmesi
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Top Glint
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.transparent, Colors.white.withValues(alpha: 0.5), Colors.transparent],
+                    )
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontFamily: 'SF Pro Text',
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.white.withValues(alpha: 0.9),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
   Widget _buildOtherFeatures() {
-    return const SizedBox();
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        final textColor = isDark ? Colors.white : Colors.grey[900]!;
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  AppStrings.otherFeatures,
+                  style: AppTextStyles.headingMedium.copyWith(
+                    color: textColor,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.1,
+              children: [
+                _buildGlassFeatureCard(
+                  title: AppStrings.loveTest,
+                  icon: Icons.favorite_rounded,
+                  color: const Color(0xFFE91E63), // Pink
+                  gradient: AppColors.loveGradient,
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoveCompatibilityScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildGlassFeatureCard(
+                  title: AppStrings.auraMatch,
+                  icon: Icons.auto_awesome_rounded,
+                  color: const Color(0xFF9C27B0), // Purple
+                  gradient: AppColors.personalityGradient,
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SoulmateAnalysisScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildGlassFeatureCard(
+                  title: AppStrings.dreamInterpretation,
+                  icon: Icons.bedtime_rounded,
+                  color: const Color(0xFF673AB7), // Deep Purple
+                  gradient: const LinearGradient(colors: [Color(0xFF673AB7), Color(0xFF512DA8)]),
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const DreamInterpretationScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                _buildGlassFeatureCard(
+                  title: AppStrings.palmFortune,
+                  icon: Icons.pan_tool_rounded,
+                  color: const Color(0xFFFF9800), // Orange
+                  gradient: const LinearGradient(colors: [Color(0xFFFF9800), Color(0xFFF57C00)]),
+                  isDark: isDark,
+                  onTap: () {
+                     Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PalmFortuneScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildGlassFeatureCard(
+                  title: AppStrings.tarot,
+                  icon: Icons.style_rounded,
+                  color: const Color(0xFF3F51B5), // Indigo
+                  gradient: const LinearGradient(colors: [Color(0xFF3F51B5), Color(0xFF303F9F)]),
+                  isDark: isDark,
+                  onTap: () {
+                    _onBottomNavTap(1); 
+                  },
+                ),
+                _buildGlassFeatureCard(
+                  title: AppStrings.auraAnalysis,
+                  icon: Icons.auto_awesome_rounded,
+                  color: const Color(0xFF9C27B0), // Purple
+                  gradient: const LinearGradient(colors: [Color(0xFF9C27B0), Color(0xFF7B1FA2)]),
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AuraUpdateScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildGlassFeatureCard(
+                  title: AppStrings.spinWheel,
+                  icon: Icons.casino_rounded,
+                  color: const Color(0xFF673AB7), // Deep Purple
+                  gradient: const LinearGradient(colors: [Color(0xFF673AB7), Color(0xFF512DA8)]),
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SpinWheelScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildGlassFeatureCard(
+                  title: AppStrings.liveChat,
+                  icon: Icons.chat_bubble_rounded,
+                  color: const Color(0xFFFFC107), // Amber
+                  gradient: const LinearGradient(colors: [Color(0xFFFFCA28), Color(0xFFFFA000)]),
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LiveChatScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
   }
 
+  Widget _buildGlassFeatureCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required Gradient gradient,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24), // Increased radius for smoother feel
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [
+                    color.withValues(alpha: 0.15),
+                    Colors.black.withValues(alpha: 0.5),
+                  ]
+                : [
+                    Colors.white.withValues(alpha: 0.9),
+                    color.withValues(alpha: 0.1),
+                  ],
+          ),
+          border: Border.all(
+            color: color.withValues(alpha: 0.3),
+            width: 1.5, // Slightly thicker border
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.15),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2), // Depth shadow
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), // Increased blur
+            child: Stack(
+              alignment: Alignment.center, // CRITICAL: Centers everything
+              children: [
+                // Top Gloss
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 40,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.15),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Content
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center, // CRITICAL
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Floating Glass Icon
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: gradient,
+                          boxShadow: [
+                            BoxShadow(
+                              color: color.withValues(alpha: 0.5),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                              spreadRadius: 1,
+                            ),
+                          ],
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: Colors.white,
+                          size: 30, // Slightly larger icon
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      
+                      // Text
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.grey[900],
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          letterSpacing: 0.3,
+                          height: 1.2,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
   Widget _buildHoroscopeSection() {
-    return const SizedBox();
+    return Consumer2<ThemeProvider, LanguageProvider>(
+      builder: (context, themeProvider, languageProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        final textColor = isDark ? Colors.white : Colors.grey[900]!;
+        final textSecondaryColor = isDark ? Colors.white60 : Colors.grey[600]!;
+        
+        // Reload horoscopes when language changes
+        final currentLanguageCode = languageProvider.languageCode;
+        if (_lastLanguageCode != null && _lastLanguageCode != currentLanguageCode) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _loadHoroscopes();
+            }
+          });
+        }
+        _lastLanguageCode = currentLanguageCode;
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppStrings.dailyHoroscope,
+              style: AppTextStyles.headingMedium.copyWith(color: textColor),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              AppStrings.aiUpdatedDaily,
+              style: AppTextStyles.bodySmall.copyWith(color: textSecondaryColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 122,
+          child: _loadingHoroscopes
+              ? Center(
+                  child: MysticalLoading(
+                    type: MysticalLoadingType.spinner,
+                    size: 24,
+                    color: textColor,
+                  ),
+                )
+              : ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _zodiacList.length,
+                  separatorBuilder: (ctx, i) => const SizedBox(width: 10),
+                  itemBuilder: (ctx, i) {
+                    final z = _zodiacList[i];
+                    final desc = _horoscopes[z['name']] ?? _getDefaultHoroscope(z['name']!);
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => HoroscopeDetailScreen(
+                              zodiacName: z['name']!,
+                              emoji: z['emoji'] ?? '',
+                            ),
+                          ),
+                        );
+                      },
+                      child: _zodiacCard(z, desc, isDark),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+      },
+    );
   }
 
   Widget _zodiacCard(Map<String, String> zodiac, String description, [bool isDark = true]) {
-    return const SizedBox();
-  }
-  
-  static const List<Map<String, String>> _zodiacList = [];
+    // Helper to get asset
+    String _zodiacAssetForName(String name) {
+      final lower = name.toLowerCase()
+          .replaceAll('ı', 'i')
+          .replaceAll('ş', 's')
+          .replaceAll('ğ', 'g')
+          .replaceAll('ç', 'c')
+          .replaceAll('ö', 'o')
+          .replaceAll('ü', 'u');
+      if (lower.contains('koc')) return 'assets/burclar/koc.png';
+      if (lower.contains('boga')) return 'assets/burclar/boga.png';
+      if (lower.contains('ikiz')) return 'assets/burclar/ikizler.png';
+      if (lower.contains('yengec')) return 'assets/burclar/yengec.png';
+      if (lower.contains('aslan')) return 'assets/burclar/aslan.png';
+      if (lower.contains('basak')) return 'assets/burclar/basak.png';
+      if (lower.contains('terazi')) return 'assets/burclar/terazi.png';
+      if (lower.contains('akrep')) return 'assets/burclar/akrep.png';
+      if (lower.contains('yay')) return 'assets/burclar/yay.png';
+      if (lower.contains('oglak')) return 'assets/burclar/oglak.png';
+      if (lower.contains('kova')) return 'assets/burclar/kova.png';
+      if (lower.contains('balik')) return 'assets/burclar/balik.png';
+      return 'assets/icons/astrology.png';
+    }
+    
+    // Helper for localized name
+    String _localizedZodiacName(String name) {
+       return _getZodiacSignName(name);
+    }
+    
+    // Cosmic/Mystic Color Palette for Zodiacs
+    final baseColor = isDark ? const Color(0xFF6C63FF) : const Color(0xFF5A4FCF);
 
-  Widget _buildFeatureCard({
-    required String title,
-    required IconData icon,
-    required Gradient gradient,
-    required Color glowColor,
-    required VoidCallback onTap,
-  }) {
-    return const SizedBox();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Stack(
+        children: [
+          // Atmospheric Glass Background
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              width: 140,
+              height: 180,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isDark 
+                      ? [
+                          const Color(0xFF2E1A47).withValues(alpha: 0.8), // Deep Cosmic Purple
+                          const Color(0xFF4527A0).withValues(alpha: 0.6),
+                        ]
+                      : [
+                          const Color(0xFFEDE7F6).withValues(alpha: 0.9), // Light Lavender
+                          const Color(0xFFD1C4E9).withValues(alpha: 0.7),
+                        ],
+                ),
+                border: Border.all(
+                  color: isDark 
+                      ? Colors.white.withValues(alpha: 0.1) 
+                      : Colors.white.withValues(alpha: 0.6),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: baseColor.withValues(alpha: 0.15),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Icon
+                  Image.asset(
+                    _zodiacAssetForName(zodiac['name']!),
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 12),
+                  // Name
+                  Text(
+                    _localizedZodiacName(zodiac['name']!),
+                    style: AppTextStyles.bodyMedium.copyWith(
+                       color: isDark ? Colors.white : Colors.deepPurple[900],
+                       fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 6),
+                  // Description / Horoscope Preview
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        description,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : Colors.deepPurple[700],
+                          fontSize: 10,
+                          fontWeight: FontWeight.w400,
+                          height: 1.2,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Subtle Top Gradient Overlay
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 40,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    baseColor.withValues(alpha: 0.1),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+
+  static const List<Map<String, String>> _zodiacList = [
+    // İsimler veri ve AI tarafında Türkçe kalıyor; ekranda gösterirken AppStrings ile çeviriyoruz
+    {"name": "Koç", "emoji": "♈️", "desc": "Enerjik ve cesur bir gün."},
+    {"name": "Boğa", "emoji": "♉️", "desc": "Dengede kal, sabırlı ol."},
+    {"name": "İkizler", "emoji": "♊️", "desc": "Sosyal ilişkiler önde."},
+    {"name": "Yengeç", "emoji": "♋️", "desc": "Duygularına kulak ver."},
+    {"name": "Aslan", "emoji": "♌️", "desc": "Kendini gösterme zamanı."},
+    {"name": "Başak", "emoji": "♍️", "desc": "Detaylara dikkat et."},
+    {"name": "Terazi", "emoji": "♎️", "desc": "Uyum ve denge ön planda."},
+    {"name": "Akrep", "emoji": "♏️", "desc": "Derin hisler ve sezgi."},
+    {"name": "Yay", "emoji": "♐️", "desc": "Macera seni bekliyor."},
+    {"name": "Oğlak", "emoji": "♑️", "desc": "Hedeflerine odaklan."},
+    {"name": "Kova", "emoji": "♒️", "desc": "Yeniliklere açık ol."},
+    {"name": "Balık", "emoji": "♓️", "desc": "Hayal gücünü kullan."},
+  ];
+
+
 
   Widget _buildBottomNavigationBar() {
     return LiquidGlassNavbar(
       currentIndex: _selectedIndex,
       onTap: _onBottomNavTap,
+      backgroundKey: _backgroundKey,
       items: [
         NavbarItem(
           icon: Icons.home_outlined,
-          activeIcon: Icons.home_rounded,
-          label: _isEnglish ? 'Home' : 'Ana Sayfa',
+          activeIcon: Icons.home,
+          label: AppStrings.home,
         ),
         NavbarItem(
-          icon: Icons.history_outlined,
-          activeIcon: Icons.history_rounded,
-          label: _isEnglish ? 'History' : 'Geçmiş',
+          icon: Icons.auto_awesome_outlined, 
+          activeIcon: Icons.auto_awesome,
+          label: AppStrings.fortunes,
         ),
         NavbarItem(
           icon: Icons.quiz_outlined,
-          activeIcon: Icons.quiz_rounded,
-          label: _isEnglish ? 'Tests' : 'Testler',
+          activeIcon: Icons.quiz,
+          label: AppStrings.tests,
         ),
         NavbarItem(
           icon: Icons.people_outline,
-          activeIcon: Icons.people_rounded,
-          label: _isEnglish ? 'Social' : 'Sosyal',
+          activeIcon: Icons.people,
+          label: AppStrings.social,
         ),
         NavbarItem(
           icon: Icons.person_outline,
-          activeIcon: Icons.person_rounded,
-          label: _isEnglish ? 'Profile' : 'Profil',
+          activeIcon: Icons.person,
+          label: AppStrings.profile,
         ),
       ],
     );
   }
 
- /*
- Future<void> _loadPendingRequestsCount() async {
+  Widget _buildNavItem(int index, IconData icon, IconData activeIcon, String label, {bool showBadge = false, bool isDark = true}) {
+    final isSelected = _selectedIndex == index;
+    final color = isSelected ? AppColors.primary : (isDark ? AppColors.textSecondary : Colors.grey[600]!);
+    
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _onBottomNavTap(index),
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  isSelected ? activeIcon : icon,
+                  color: color,
+                  size: 24,
+                ),
+                if (showBadge && _pendingRequestsCount > 0)
+                  Positioned(
+                    right: -6,
+                    top: -6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? AppColors.surfaceColor : AppColors.lightSurface, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withValues(alpha: 0.6),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        _pendingRequestsCount > 99 ? '99+' : '$_pendingRequestsCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          height: 1.0,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: (isSelected ? AppTextStyles.navigationLabel : AppTextStyles.navigationLabel).copyWith(
+                color: color,
+                fontSize: 11,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadPendingRequestsCount() async {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       
@@ -2180,70 +3375,6 @@ class _MainScreenState extends State<MainScreen>
     });
   }
 
-  // HomeScreen'deki "Fallarımı Göster" kartı
-  Widget _showResultsCard([String? fortuneTypeFilter]) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _pendingHistoryFilter = fortuneTypeFilter ?? 'all';
-          _selectedIndex = 1;
-        });
-        _pageController.animateToPage(1, duration: Duration(milliseconds: 300), curve: Curves.easeInOut);
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 1),
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFA6EA7), Color(0xFF7E18A6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.purple.withValues(alpha: 0.12),
-                  blurRadius: 7,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.style, color: Colors.white, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  AppStrings.showMyFortunes,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: .13,
-                    shadows: [
-                      Shadow(color: Colors.black26, blurRadius: 2, offset: Offset(1, 2)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
- */
-  Future<void> _loadPendingRequestsCount() async {}
-  void _startPendingRequestsListener() {}
-  Widget _showResultsCard([String? fortuneTypeFilter]) { return const SizedBox(); }
-
   @override
   void dispose() {
     _pendingRequestsSubscription?.cancel();
@@ -2252,6 +3383,188 @@ class _MainScreenState extends State<MainScreen>
     _pageController.dispose();
     _adsService.disposeAllAds();
     super.dispose();
+  }
+
+  // HomeScreen'deki "Fallarımı Göster" kartı
+  Widget _showResultsCard([String? fortuneTypeFilter]) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        // Deep Purple / Indigo Theme
+        final baseColor = const Color(0xFF4A00E0);
+        
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _pendingHistoryFilter = fortuneTypeFilter ?? 'all';
+              _selectedIndex = 1;
+            });
+            _pageController.animateToPage(1, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
+              children: [
+                // Atmospheric Glass Background
+                BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isDark 
+                            ? [
+                                const Color(0xFF311B92).withValues(alpha: 0.85), // Deep Indigo
+                                const Color(0xFF4A148C).withValues(alpha: 0.65), // Deep Purple
+                              ]
+                            : [
+                                const Color(0xFF673AB7).withValues(alpha: 0.9), // Deep Purple
+                                const Color(0xFF512DA8).withValues(alpha: 0.8), // Indigo
+                              ],
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF311B92).withValues(alpha: 0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            // Floating Glass Icon Container
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Colors.white.withValues(alpha: 0.2),
+                                    const Color(0xFF4A00E0).withValues(alpha: 0.1),
+                                  ],
+                                ),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  )
+                                ]
+                              ),
+                              child: const Icon(
+                                Icons.history_edu_rounded, 
+                                color: Colors.white, 
+                                size: 28,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black38,
+                                    blurRadius: 5,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppStrings.showMyFortunes,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    letterSpacing: 0.5,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  AppStrings.isEnglish ? 'View your past readings' : 'Geçmiş yorumlarını incele',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontWeight: FontWeight.w500,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Colors.black12,
+                                        blurRadius: 2,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        
+                        // Action Arrow
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward_ios_rounded, 
+                            color: Colors.white, 
+                            size: 16
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Top Gloss Overlay
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 40,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.15),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // Rewarded Ad akışı
@@ -2271,44 +3584,50 @@ class _MainScreenState extends State<MainScreen>
 
 // -------- HomeScreen'deki Fal Grid'in ana sayfa versiyonu --------
 class _FalGridHome extends StatelessWidget {
-  final Future<void> Function(Widget) onNavigate;
-
-  const _FalGridHome({required this.onNavigate});
+  const _FalGridHome({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Consumer2<LanguageProvider, ThemeProvider>(
       builder: (context, languageProvider, themeProvider, child) {
+        final isDark = themeProvider.isDarkMode;
+        
         final items = [
           _FalItemHome(
             title: AppStrings.coffeeFortune,
-            iconAsset: 'assets/icons/coffee.png',
-            onTap: (ctx) => onNavigate(const CoffeeFortuneScreen()),
+            iconAsset: 'assets/icons/premium_coffee.png',
+            color: const Color(0xFFD4A373), // Warm Coffee Color
+            onTap: (ctx) => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const CoffeeFortuneScreen())),
           ),
           _FalItemHome(
             title: AppStrings.tarotFortune,
-            iconAsset: 'assets/icons/tarot.png',
-            onTap: (ctx) => onNavigate(const TarotFortuneScreen()),
+            iconAsset: 'assets/icons/premium_tarot.png',
+            color: const Color(0xFF9D4EDD), // Mystic Purple
+            onTap: (ctx) => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const TarotFortuneScreen())),
           ),
           _FalItemHome(
             title: AppStrings.palmFortune,
-            iconAsset: 'assets/icons/palm.png',
-            onTap: (ctx) => onNavigate(const PalmFortuneScreen()),
+            iconAsset: 'assets/icons/premium_palm.png',
+            color: const Color(0xFF2A9D8F), // Mystic Teal
+            onTap: (ctx) => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const PalmFortuneScreen())),
           ),
           _FalItemHome(
             title: AppStrings.katinaFortune,
-            iconAsset: 'assets/icons/katina.png',
-            onTap: (ctx) => onNavigate(const KatinaFortuneScreen()),
+            iconAsset: 'assets/icons/premium_katina.png',
+            color: const Color(0xFFE63946), // Deep Rose
+            onTap: (ctx) => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const KatinaFortuneScreen())),
           ),
           _FalItemHome(
             title: AppStrings.faceFortune,
-            iconAsset: 'assets/icons/face.png',
-            onTap: (ctx) => onNavigate(const FaceFortuneScreen()),
+            iconAsset: 'assets/icons/premium_face.png',
+            color: const Color(0xFFFFB703), // Golden Amber
+            onTap: (ctx) => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const FaceFortuneScreen())),
           ),
           _FalItemHome(
             title: AppStrings.astrology,
-            iconAsset: 'assets/icons/astrology.png',
-            onTap: (ctx) => onNavigate(const AstrologyScreen()),
+            iconAsset: 'assets/icons/premium_astrology.png',
+            color: const Color(0xFF4361EE), // Cosmic Blue
+            onTap: (ctx) => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const AstrologyScreen())),
           ),
         ];
 
@@ -2323,15 +3642,105 @@ class _FalGridHome extends StatelessWidget {
                 crossAxisCount: cross,
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
-                childAspectRatio: 0.82, 
+                childAspectRatio: 0.85,
               ),
               itemBuilder: (ctx, i) {
                 final it = items[i];
-                return RepaintBoundary(
-                  child: _GlassFalCard(
-                    title: it.title,
-                    iconAsset: it.iconAsset,
-                    onTap: () => it.onTap(ctx),
+                final baseColor = it.color ?? Colors.grey;
+                
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Glassmorphism Background with Full Atmosphere
+                      BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            // The base color is now part of the background itself
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: isDark 
+                                  ? [
+                                      baseColor.withValues(alpha: 0.25), 
+                                      Colors.black.withValues(alpha: 0.6),
+                                    ]
+                                  : [
+                                      Colors.white.withValues(alpha: 0.4),
+                                      baseColor.withValues(alpha: 0.2),
+                                    ],
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: isDark 
+                                  ? baseColor.withValues(alpha: 0.2)
+                                  : Colors.white.withValues(alpha: 0.5),
+                              width: 1.5, // Slightly clearer border
+                            ),
+                          ),
+                        ),
+                      ),
+                      
+                      // No explicit "orb" or "corner glow" anymore. 
+                      // The color is spread everywhere via the container gradient above.
+
+                      // Content
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => it.onTap(ctx),
+                          borderRadius: BorderRadius.circular(24),
+                          splashColor: baseColor.withValues(alpha: 0.3),
+                          highlightColor: baseColor.withValues(alpha: 0.15),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Icon Container
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    // More transparent background for icon to blend in
+                                    color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.5),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: baseColor.withValues(alpha: 0.3),
+                                        blurRadius: 15,
+                                        spreadRadius: 2,
+                                      )
+                                    ]
+                                  ),
+                                  child: Image.asset(
+                                    it.iconAsset,
+                                    height: 55, // Slightly larger
+                                    width: 55,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_,__,___) => Icon(Icons.star, color: baseColor, size: 30),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  it.title,
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -2339,245 +3748,6 @@ class _FalGridHome extends StatelessWidget {
           },
         );
       },
-    );
-  }
-}
-
-/// Premium Glass Card with Blur+Zoom Animation and Chromatic Aberration
-class _GlassFalCard extends StatefulWidget {
-  final String title;
-  final String iconAsset;
-  final VoidCallback onTap;
-
-  const _GlassFalCard({
-    required this.title,
-    required this.iconAsset,
-    required this.onTap,
-  });
-
-  @override
-  State<_GlassFalCard> createState() => _GlassFalCardState();
-}
-
-class _GlassFalCardState extends State<_GlassFalCard> with SingleTickerProviderStateMixin {
-  bool _isPressed = false;
-  late AnimationController _animationController;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 150));
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  void _handleTap() async {
-    // Phase 1: Suck In Animation (Forward)
-    // "İçine kapılıp..." -> We go to 1.0 (Deep 3D suck)
-    if (!_isPressed) {
-      setState(() => _isPressed = true);
-      await _animationController.forward().orCancel;
-    }
-
-    // Phase 2: Launch Next Page immediately while sucked in
-    // "sonra diğer sayfanın zoomlu gelip..."
-    
-    if (mounted) {
-      widget.onTap();
-      
-      // Reset the card state AFTER we potentially come back, or after a delay
-      // The user won't see this reset if the new page covers it properly.
-      await Future.delayed(const Duration(milliseconds: 1000));
-      if (mounted) {
-        // Silently reset or animate back gently
-        setState(() => _isPressed = false);
-        _animationController.reverse();
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    return GestureDetector(
-      onTapDown: (_) {
-        setState(() => _isPressed = true);
-        _animationController.animateTo(1.0, curve: Curves.easeOutQuad);
-      },
-      onTapUp: (_) => _handleTap(),
-      onTapCancel: () {
-        setState(() => _isPressed = false);
-        _animationController.reverse();
-      },
-      child: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          final themeProvider = Provider.of<ThemeProvider>(context);
-          // "Suck & Squeeze" Effect Logic
-          // Value 0.0 = Normal State
-          // Value 1.0 = Sucked In (Pressed) State
-          
-          final double t = _animationController.value;
-          
-          // SUCK: Scale down significantly (to 0.85)
-          // SQUEEZE/POP: The reverse animation uses ElasticOut, so it will overshoot 1.0 (to ~1.15)
-          // Since we map 0.0 -> 1.0 linearly here, the controller's Elastic curve handles the visuals.
-          // BUT: Elastic overshooting 0.0 means 't' goes negative.
-          // We need to handle negative 't' for the expanding squeeze effect.
-          
-          double scale = 1.0 - (0.15 * t); // At t=1.0, scale=0.85. At t<0 (elastic), scale > 1.0.
-          
-          // RotateX: Bends the top backwards.
-          // At t=1.0, tilt = 0.35 rad (~20 deg).
-          double tilt = 0.35 * t; 
-          
-          return Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.identity()
-              ..setEntry(3, 2, 0.002) // Stronger Perspective (was 0.001)
-              ..scale(scale)
-              ..rotateX(tilt), // Bends card "into" the screen
-            child: child,
-          );
-        },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.1) : AppColors.premiumLightSurface.withValues(alpha: 0.8),
-                    themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.05) : AppColors.premiumLightSurface.withValues(alpha: 0.5),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.2) : AppColors.premiumLightSurface.withValues(alpha: 1.0),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 15,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  // Chromatic Aberration Effect (Simulated with offset borders/glows)
-                  // Red shift
-                  Positioned(
-                    top: 1, left: 1, bottom: -1, right: -1,
-                    child: Opacity(
-                      opacity: 0.5, // Increased opacity for effect visibility
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.red.withValues(alpha: 0.3), width: 1.5),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Blue shift
-                  Positioned(
-                    top: -1, left: -1, bottom: 1, right: 1,
-                    child: Opacity(
-                      opacity: 0.5,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.blue.withValues(alpha: 0.3), width: 1.5),
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  // Content with Blur Animation 
-                  AnimatedBuilder(
-                    animation: _animationController,
-                    builder: (context, child) {
-                      // Blur increases as we get sucked in (t -> 1.0)
-                      // Blur removes as we squeeze out (t -> 0.0)
-                      double blurVal = (_animationController.value * 8).clamp(0.0, 10.0);
-                      return ImageFiltered(
-                        imageFilter: ImageFilter.blur(
-                          sigmaX: blurVal,
-                          sigmaY: blurVal,
-                        ),
-                        child: child,
-                      );
-                    },
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                           Container(
-                            height: 85,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.15) : AppColors.premiumLightAccent.withValues(alpha: 0.15),
-                                  Colors.transparent,
-                                ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                  blurRadius: 20,
-                                  spreadRadius: 5,
-                                ),
-                              ],
-                            ),
-                            child: Image.asset(
-                              widget.iconAsset,
-                              fit: BoxFit.contain,
-                              cacheWidth: 170,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                            child: Text(
-                              widget.title,
-                              style: TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.getTextPrimary(themeProvider.isDarkMode),
-                                shadows: themeProvider.isDarkMode ? [
-                                  Shadow(
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                    blurRadius: 5,
-                                  ),
-                                ] : null,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -2585,258 +3755,13 @@ class _GlassFalCardState extends State<_GlassFalCard> with SingleTickerProviderS
 class _FalItemHome {
   final String title;
   final String iconAsset;
-  final void Function(BuildContext) onTap;
-  _FalItemHome({required this.title, required this.iconAsset, required this.onTap});
-}
+  final Color? color;
+  final Function(BuildContext) onTap;
 
-/// Glassmorphism CTA Button with iOS scale animation
-/// Glassmorphism CTA Button with iOS scale animation
-class _GlassCTAButton extends StatefulWidget {
-  final String text;
-  final VoidCallback onPressed;
-  final IconData? icon;
-
-  const _GlassCTAButton({
-    required this.text,
-    required this.onPressed,
-    this.icon,
-  });
-
-  @override
-  State<_GlassCTAButton> createState() => _GlassCTAButtonState();
-}
-
-class _GlassCTAButtonState extends State<_GlassCTAButton> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) {
-        setState(() => _isPressed = false);
-        widget.onPressed();
-      },
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedScale(
-        scale: _isPressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutQuart,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(27),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: Container(
-              width: double.infinity,
-              height: 54,
-              decoration: BoxDecoration(
-                gradient: AppColors.champagneGoldGradient,
-                borderRadius: BorderRadius.circular(27),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.champagneGold.withValues(alpha: 0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (widget.icon != null) ...[
-                      Icon(
-                        widget.icon,
-                        color: AppColors.premiumDarkBg,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      widget.text,
-                      style: TextStyle(
-                        fontFamily: 'SF Pro Display',
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.premiumDarkBg,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Reusable Glass Feature Card with iOS scale animation
-class _GlassFeatureCard extends StatefulWidget {
-  final String title;
-  final IconData icon;
-  final Color iconColor;
-  final VoidCallback onTap;
-
-  const _GlassFeatureCard({
+  _FalItemHome({
     required this.title,
-    required this.icon,
-    required this.iconColor,
+    required this.iconAsset,
+    this.color,
     required this.onTap,
   });
-
-  @override
-  State<_GlassFeatureCard> createState() => _GlassFeatureCardState();
-}
-
-class _GlassFeatureCardState extends State<_GlassFeatureCard> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) {
-        setState(() => _isPressed = false);
-        widget.onTap();
-      },
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedScale(
-        scale: _isPressed ? 0.95 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutQuart,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8), // Reverted blur
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.12) : AppColors.premiumLightSurface.withValues(alpha: 0.9),
-                    themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.06) : AppColors.premiumLightSurface.withValues(alpha: 0.7),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: themeProvider.isDarkMode ? Colors.white.withValues(alpha: 0.15) : AppColors.premiumLightSurface,
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 15,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          widget.iconColor.withValues(alpha: 0.25),
-                          widget.iconColor.withValues(alpha: 0.12),
-                        ],
-                      ),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: widget.iconColor.withValues(alpha: 0.4),
-                        width: 1,
-                      ),
-                    ),
-                    child: Icon(
-                      widget.icon,
-                      color: widget.iconColor,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.title,
-                    style: TextStyle(
-                      fontFamily: 'SF Pro Text',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.getTextPrimary(themeProvider.isDarkMode).withValues(alpha: 0.9),
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Custom PageRoute for "Zoom + Blur" transition with Background Blur
-/// Optimized for 120Hz displays with ultra-smooth animations
-class ZoomBlurPageRoute<T> extends PageRouteBuilder<T> {
-  final Widget page;
-
-  ZoomBlurPageRoute({required this.page})
-      : super(
-          pageBuilder: (context, animation, secondaryAnimation) => page,
-          opaque: false, // Allows seeing the background (Home)
-          barrierColor: Colors.black.withValues(alpha: 0.0), // Transparent barrier
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            // Use more refined curves for 120Hz smoothness
-            final curve = CurvedAnimation(
-              parent: animation, 
-              curve: Curves.easeOutExpo, // Smoother curve for 120Hz
-            );
-            
-            // 1. Foreground Zoom: 1.25 -> 1.0 (Reduced for smoother feel)
-            final scaleAnimation = Tween<double>(begin: 1.25, end: 1.0).animate(curve);
-
-            // 2. Foreground Blur: 12px -> 0px (Reduced for performance)
-            final blurVal = Tween<double>(begin: 12.0, end: 0.0).animate(curve);
-
-            // 3. Foreground Fade with separate curve for premium feel
-            final fadeCurve = CurvedAnimation(
-              parent: animation,
-              curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-            );
-            final fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(fadeCurve);
-
-            return AnimatedBuilder(
-              animation: animation,
-              builder: (context, child) {
-                return FadeTransition(
-                  opacity: fadeAnimation,
-                  child: Transform.scale(
-                    scale: scaleAnimation.value,
-                    child: ImageFiltered(
-                      imageFilter: ImageFilter.blur(
-                        sigmaX: blurVal.value,
-                        sigmaY: blurVal.value,
-                      ),
-                      child: child,
-                    ),
-                  ),
-                );
-              },
-              child: child,
-            );
-          },
-          // Optimized timings for 120Hz (96 frames for entry, 72 frames for exit)
-          transitionDuration: const Duration(milliseconds: 500), // 60 frames at 120Hz
-          reverseTransitionDuration: const Duration(milliseconds: 400), // 48 frames at 120Hz
-        );
 }

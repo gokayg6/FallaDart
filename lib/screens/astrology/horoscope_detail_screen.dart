@@ -7,11 +7,9 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/providers/language_provider.dart';
-import '../../core/providers/user_provider.dart';
 import '../../core/utils/share_utils.dart';
 import '../../core/widgets/shareable_horoscope_card.dart';
 import '../../providers/theme_provider.dart';
-import '../premium/premium_screen.dart';
 
 class HoroscopeDetailScreen extends StatefulWidget {
   final String zodiacName;
@@ -53,52 +51,29 @@ class _HoroscopeDetailScreenState extends State<HoroscopeDetailScreen> {
       final shortKey = isEnglish ? 'shorts_en' : 'shorts';
 
       final docRef = _firestore.collection('horoscopes').doc(dateKey);
-      
-      // First, try to read from cache
       final doc = await docRef.get();
       Map<String, dynamic> data = doc.data() ?? {};
       final texts = Map<String, dynamic>.from(data[textKey] ?? {});
+      final shorts = Map<String, dynamic>.from(data[shortKey] ?? {});
       String? text = texts[widget.zodiacName]?.toString();
-      
-      // If not in cache, use transaction to ensure only one user generates (API tasarrufu)
       if (text == null || text.isEmpty) {
-        await _firestore.runTransaction((transaction) async {
-          final freshDoc = await transaction.get(docRef);
-          final freshData = freshDoc.data();
-          final freshTexts = Map<String, dynamic>.from(freshData?[textKey] ?? {});
-          
-          // Check again if data exists (another user might have generated it)
-          String? freshText = freshTexts[widget.zodiacName]?.toString();
-          
-          if (freshText == null || freshText.isEmpty) {
-            // Generate horoscope (only first user will reach here)
-            final aiSign = isEnglish ? _mapTurkishSignToEnglish(widget.zodiacName) : widget.zodiacName;
-            freshText = await _ai.generateDailyHoroscope(
-              zodiacSign: aiSign,
-              date: today,
-              english: isEnglish,
-            );
-            final short = _summarizeShort(freshText);
-            
-            // Update Firestore
-            final updatedTexts = Map<String, dynamic>.from(freshTexts);
-            final updatedShorts = Map<String, dynamic>.from(freshData?[shortKey] ?? {});
-            updatedTexts[widget.zodiacName] = freshText;
-            updatedShorts[widget.zodiacName] = short;
-            
-            transaction.set(docRef, {
-              'date': dateKey,
-              textKey: updatedTexts,
-              shortKey: updatedShorts,
-              'createdAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-          }
-          
-          text = freshText;
-        });
+        // Generate now, then cache into today's doc
+        final aiSign = isEnglish ? _mapTurkishSignToEnglish(widget.zodiacName) : widget.zodiacName;
+        text = await _ai.generateDailyHoroscope(
+          zodiacSign: aiSign,
+          date: today,
+          english: isEnglish,
+        );
+        final short = _summarizeShort(text);
+        texts[widget.zodiacName] = text;
+        shorts[widget.zodiacName] = short;
+        await docRef.set({
+          'date': dateKey,
+          textKey: texts,
+          shortKey: shorts,
+          'createdAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       }
-      
       if (!mounted) return;
       setState(() {
         _fullText = text;
@@ -390,59 +365,6 @@ class _HoroscopeDetailScreenState extends State<HoroscopeDetailScreen> {
   }
 
   Future<void> _generateTomorrow() async {
-    // Premium guard: yarın için önsezi sadece gerçek premium kullanıcılara açık (debug free yok)
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final isPremium = userProvider.user?.isPremium == true;
-    if (!isPremium) {
-      final isEnglish = AppStrings.isEnglish;
-      final title = isEnglish ? 'Premium feature' : 'Premium özellik';
-      final message = isEnglish
-          ? 'Tomorrow\'s insight is available only for premium users.'
-          : 'Yarın için önsezi sadece premium kullanıcılar için kullanılabilir.';
-      final goPremiumLabel = isEnglish ? 'Go Premium' : 'Premium\'a geç';
-      final laterLabel = isEnglish ? 'Maybe later' : 'Daha sonra';
-
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) {
-          final themeProvider = Provider.of<ThemeProvider>(ctx, listen: false);
-          final isDark = themeProvider.isDarkMode;
-          return AlertDialog(
-            backgroundColor: AppColors.getCardBackground(isDark),
-            title: Text(
-              title,
-              style: TextStyle(color: AppColors.getTextPrimary(isDark)),
-            ),
-            content: Text(
-              message,
-              style: TextStyle(color: AppColors.getTextSecondary(isDark)),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(laterLabel),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const PremiumScreen(),
-                    ),
-                  );
-                },
-                child: Text(
-                  goPremiumLabel,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-      return;
-    }
-
     setState(() => _loadingTomorrow = true);
     try {
       final today = DateTime.now();

@@ -13,7 +13,7 @@ class CoffeeEntryScreen extends StatelessWidget {
     final isDark = themeProvider.isDarkMode;
     
     return Scaffold(
-      backgroundColor: AppColors.getBackground(isDark),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text('Kahve Falı Başlat', style: TextStyle(color: AppColors.getTextPrimary(isDark))),
         backgroundColor: Colors.transparent,
@@ -21,7 +21,9 @@ class CoffeeEntryScreen extends StatelessWidget {
         elevation: 0,
         centerTitle: true,
       ),
-      body: Center(
+      body: Container(
+        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
+        child: Center(
         child: Padding(
           padding: const EdgeInsets.all(30.0),
           child: Column(
@@ -61,7 +63,8 @@ class CoffeeEntryScreen extends StatelessWidget {
                 ),
               ),
             ],
-          ),
+            ),
+      ),
         ),
       ),
     );

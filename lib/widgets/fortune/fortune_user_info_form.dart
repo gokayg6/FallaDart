@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -6,9 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/providers/user_provider.dart';
-import '../../core/widgets/glassmorphism_components.dart';
 import '../../providers/theme_provider.dart';
-import 'liquid_glass_picker.dart';
 
 class FortuneUserInfoForm extends StatefulWidget {
   final Function(Map<String, dynamic>) onChanged;
@@ -37,7 +34,7 @@ class _FortuneUserInfoFormState extends State<FortuneUserInfoForm>
   late AnimationController _toggleController;
   late Animation<double> _toggleAnimation;
 
-  // Data Lists
+  // Data Lists (language-aware via AppStrings)
   List<String> get _topics => AppStrings.fortuneTopics;
   List<String> get _relationshipStatuses => AppStrings.relationshipStatusOptions;
   List<String> get _jobStatuses => AppStrings.jobStatusOptions;
@@ -65,8 +62,9 @@ class _FortuneUserInfoFormState extends State<FortuneUserInfoForm>
       _relationshipStatus = widget.initialData!['relationshipStatus'];
       _jobStatus = widget.initialData!['jobStatus'];
     } else {
-      _topic1 = AppStrings.fortuneTopics.first; 
-      _topic2 = AppStrings.fortuneTopics.length > 3 ? AppStrings.fortuneTopics[3] : AppStrings.fortuneTopics.last;
+      // Defaults
+      _topic1 = AppStrings.fortuneTopics.first; // 'Aşk' / 'Love'
+      _topic2 = AppStrings.fortuneTopics[3]; // 'Kariyer' / 'Career'
     }
     
     if (_isForSelf) {
@@ -122,11 +120,34 @@ class _FortuneUserInfoFormState extends State<FortuneUserInfoForm>
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final picked = await showLiquidGlassDatePicker(
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.isDarkMode;
+    
+    final picked = await showDatePicker(
       context: context,
       initialDate: _birthDate ?? DateTime(now.year - 20),
       firstDate: DateTime(1900),
       lastDate: now,
+      builder: (context, child) {
+        return Theme(
+          data: isDark 
+            ? Theme.of(context).copyWith(
+                colorScheme: ColorScheme.dark(
+                  primary: AppColors.primary,
+                  surface: AppColors.cardBackground,
+                  onSurface: Colors.white,
+                ), dialogTheme: DialogThemeData(backgroundColor: AppColors.background),
+              )
+            : Theme.of(context).copyWith(
+                colorScheme: ColorScheme.light(
+                  primary: AppColors.primary,
+                  surface: Colors.white,
+                  onSurface: Colors.grey[900]!,
+                ), dialogTheme: DialogThemeData(backgroundColor: Colors.grey[100]),
+              ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -140,179 +161,279 @@ class _FortuneUserInfoFormState extends State<FortuneUserInfoForm>
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
-    final textPrimary = AppColors.getTextPrimary(isDark);
-    final textSecondary = AppColors.getTextSecondary(isDark);
-    final textDisabled = AppColors.getTextDisabled(isDark);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 1. Topics
-        _buildSectionLabel(AppStrings.fortuneTopicsTitle, Icons.auto_awesome),
+        _buildSectionLabel(AppStrings.fortuneTopicsTitle, Icons.auto_awesome, isDark),
         const SizedBox(height: 12),
-        GlassCard(
-          borderRadius: 16,
-          child: Column(
-            children: [
-              _buildTopicRow(AppStrings.topic1Label, _topic1, Icons.star, _topics, (val) {
-                setState(() => _topic1 = val);
-                _notifyChanges();
-              }),
-              Divider(color: AppColors.getDividerColor(isDark), height: 1),
-              _buildTopicRow(AppStrings.topic2Label, _topic2, Icons.star_border, _topics, (val) {
-                setState(() => _topic2 = val);
-                _notifyChanges();
-              }),
-            ],
-          ),
-        ),
+        _buildTopicsSection(isDark),
         const SizedBox(height: 24),
 
         // 2. For Whom?
-        _buildSectionLabel(AppStrings.forWhomTitle, Icons.person),
+        _buildSectionLabel(AppStrings.forWhomTitle, Icons.person, isDark),
         const SizedBox(height: 12),
-        _buildForWhomToggle(),
+        _buildForWhomToggle(isDark),
         const SizedBox(height: 24),
 
         // 3. Name
-        _buildSectionLabel(AppStrings.nameTitle, Icons.badge),
+        _buildSectionLabel(AppStrings.nameTitle, Icons.badge, isDark),
         const SizedBox(height: 12),
-        GlassContainer(
-          borderRadius: 16,
-          child: TextField(
-            controller: _nameController,
-            style: PremiumTextStyles.body.copyWith(color: textPrimary),
-            cursorColor: AppColors.champagneGold,
-            decoration: InputDecoration(
-              hintText: AppStrings.nameHint,
-              hintStyle: PremiumTextStyles.body.copyWith(color: textDisabled),
-              prefixIcon: Icon(Icons.person_outline, color: AppColors.champagneGold),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            ),
-          ),
+        _buildTextField(
+          controller: _nameController,
+          hintText: AppStrings.nameHint,
+          icon: Icons.person_outline,
+          isDark: isDark,
         ),
         const SizedBox(height: 24),
 
         // 4. Birth Date
-        _buildSectionLabel(AppStrings.birthDateTitle, Icons.cake),
+        _buildSectionLabel(AppStrings.birthDateTitle, Icons.cake, isDark),
         const SizedBox(height: 12),
-        _buildDatePicker(),
+        _buildDatePicker(isDark),
         const SizedBox(height: 24),
 
         // 5. Relationship Status
-        _buildSectionLabel(AppStrings.relationshipStatusTitle, Icons.favorite),
+        _buildSectionLabel(AppStrings.relationshipStatusTitle, Icons.favorite, isDark),
         const SizedBox(height: 12),
-        _buildPickerField(
+        _buildDropdown(
           value: _relationshipStatus,
           items: _relationshipStatuses,
           hint: AppStrings.selectHint,
           icon: Icons.favorite_border,
-          title: AppStrings.relationshipStatusTitle,
           onChanged: (val) {
             setState(() => _relationshipStatus = val);
             _notifyChanges();
           },
+          isDark: isDark,
         ),
         const SizedBox(height: 24),
 
         // 6. Job Status
-        _buildSectionLabel(AppStrings.jobStatusTitle, Icons.work),
+        _buildSectionLabel(AppStrings.jobStatusTitle, Icons.work, isDark),
         const SizedBox(height: 12),
-         _buildPickerField(
+        _buildDropdown(
           value: _jobStatus,
           items: _jobStatuses,
           hint: AppStrings.selectHint,
           icon: Icons.business_center,
-          title: AppStrings.jobStatusTitle,
           onChanged: (val) {
             setState(() => _jobStatus = val);
             _notifyChanges();
           },
+          isDark: isDark,
         ),
-        
-        // Extra bottom padding for scroll
-        const SizedBox(height: 100),
       ],
     );
   }
 
-  Widget _buildSectionLabel(String text, IconData icon) {
+  Widget _buildSectionLabel(String text, IconData icon, bool isDark) {
+    final textColor = AppColors.getTextPrimary(isDark);
+    
     return Row(
       children: [
-        ShaderMask(
-          shaderCallback: (bounds) => AppColors.champagneGoldGradient.createShader(bounds),
-          child: Icon(icon, color: Colors.white, size: 20),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary.withOpacity(0.3),
+                AppColors.secondary.withOpacity(0.3),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 18),
         ),
         const SizedBox(width: 10),
         Text(
           text,
-          style: PremiumTextStyles.headline.copyWith(fontSize: 18, color: AppColors.getTextPrimary(Provider.of<ThemeProvider>(context).isDarkMode)),
+          style: AppTextStyles.bodyLarge.copyWith(
+            color: textColor,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildTopicRow(String label, String? value, IconData icon, List<String> items, ValueChanged<String?> onChanged) {
-    return GestureDetector(
-      onTap: () async {
-        final result = await showLiquidGlassPicker(
-          context: context,
-          items: items,
-          initialValue: value,
-          title: label,
-        );
-        if (result != null) onChanged(result);
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.champagneGold.withOpacity(0.8), size: 18),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: PremiumTextStyles.body.copyWith(fontWeight: FontWeight.w500),
-            ),
-            const Spacer(),
-            Text(
-              value ?? AppStrings.selectHint,
-              style: PremiumTextStyles.body.copyWith(
-                color: value != null ? AppColors.champagneGold : AppColors.getTextDisabled(Provider.of<ThemeProvider>(context).isDarkMode),
-                fontWeight: value != null ? FontWeight.w600 : FontWeight.normal
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.arrow_forward_ios, color: AppColors.getTextDisabled(Provider.of<ThemeProvider>(context).isDarkMode), size: 14),
+  Widget _buildTopicsSection(bool isDark) {
+    final cardBg = isDark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.08);
+    final borderColor = isDark ? Colors.white.withOpacity(0.15) : Colors.grey.withOpacity(0.2);
+    final dividerColor = isDark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.3);
+    
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cardBg,
+            cardBg.withOpacity(0.5),
           ],
         ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: borderColor,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDark ? Colors.black : Colors.grey).withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildTopicRow(
+              AppStrings.topic1Label, _topic1, Icons.star, (val) {
+            setState(() => _topic1 = val);
+            _notifyChanges();
+          }, isDark),
+          Container(
+            height: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  dividerColor,
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+          _buildTopicRow(
+              AppStrings.topic2Label, _topic2, Icons.star_border, (val) {
+            setState(() => _topic2 = val);
+            _notifyChanges();
+          }, isDark),
+        ],
       ),
     );
   }
 
-  Widget _buildForWhomToggle() {
-    return GlassContainer(
-      padding: EdgeInsets.zero,
-      borderRadius: 16,
-      child: SizedBox(
-        height: 50,
-        child: Stack(
-          children: [
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              left: _isForSelf ? 0 : MediaQuery.of(context).size.width / 2 - 20, 
-              // Note: Exact layout depends on parent constraints.
-              // Assuming this widget is used in full width.
-              // For consistent "half width" highlight, we can use LayoutBuilder.
-              // But for now keeping it simple as before, but corrected
-              // The previous implementation relied on Flex, but AnimatedPositioned needs explicit rect.
-              // Let's use logic:
-              // Since we don't know width here easily without LayoutBuilder,
-              // Let's use a cleaner approach with AnimatedAlign or similar.
-              child: Container(),
+  Widget _buildTopicRow(String label, String? value, IconData icon, ValueChanged<String?> onChanged, bool isDark) {
+    final textColor = AppColors.getTextPrimary(isDark);
+    final textSecondaryColor = AppColors.getTextSecondary(isDark);
+    final hintColor = isDark ? Colors.white38 : Colors.grey;
+    final dropdownBg = AppColors.getCardBackground(isDark);
+    final fieldBg = isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1);
+    final fieldBorder = isDark ? Colors.white.withOpacity(0.1) : Colors.grey.withOpacity(0.2);
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primary.withOpacity(0.7), size: 20),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: textSecondaryColor,
+              fontWeight: FontWeight.w500,
             ),
-             Row(
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: fieldBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: fieldBorder,
+                ),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _topics.contains(value) ? value : null,
+                  hint: Text(
+                    AppStrings.selectHint,
+                    style: TextStyle(color: hintColor, fontSize: 14),
+                  ),
+                  dropdownColor: dropdownBg,
+                  isExpanded: true,
+                  icon: Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                  style: TextStyle(color: textColor, fontSize: 14),
+                  items: _topics.map((t) {
+                    return DropdownMenuItem(
+                      value: t,
+                      child: Text(t),
+                    );
+                  }).toList(),
+                  onChanged: onChanged,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildForWhomToggle(bool isDark) {
+    final cardBg = isDark ? Colors.white.withOpacity(0.1) : Colors.grey.withOpacity(0.1);
+    final borderColor = isDark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.25);
+    final inactiveColor = isDark ? Colors.white60 : Colors.grey[600]!;
+    
+    return AnimatedBuilder(
+      animation: _toggleAnimation,
+      builder: (context, child) {
+        return Container(
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                cardBg,
+                cardBg.withOpacity(0.5),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: borderColor,
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (isDark ? Colors.black : Colors.grey).withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Animated background
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                left: _isForSelf ? 8 : MediaQuery.of(context).size.width / 2 - 16 - 8,
+                right: _isForSelf ? MediaQuery.of(context).size.width / 2 - 16 - 8 : 8,
+                top: 8,
+                bottom: 8,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.5),
+                        blurRadius: 12,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Buttons
+              Row(
                 children: [
                   Expanded(
                     child: GestureDetector(
@@ -323,32 +444,28 @@ class _FortuneUserInfoFormState extends State<FortuneUserInfoForm>
                         _notifyChanges();
                       },
                       child: Container(
-                        color: Colors.transparent, // Hit test
                         alignment: Alignment.center,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                           decoration: BoxDecoration(
-                              color: _isForSelf ? AppColors.champagneGold.withOpacity(0.2) : Colors.transparent,
-                              borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.person,
+                              color: _isForSelf ? Colors.white : inactiveColor,
+                              size: 20,
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            width: double.infinity,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.person, color: _isForSelf ? AppColors.champagneGold : AppColors.getTextDisabled(Provider.of<ThemeProvider>(context).isDarkMode), size: 18),
-                              const SizedBox(width: 8),
-                              Text(AppStrings.forMyself, style: PremiumTextStyles.body.copyWith(
-                                color: _isForSelf ? AppColors.champagneGold : AppColors.getTextDisabled(Provider.of<ThemeProvider>(context).isDarkMode),
-                                fontWeight: _isForSelf ? FontWeight.bold : FontWeight.normal
-                              )),
-                            ],
-                          ),
+                            const SizedBox(width: 8),
+                            Text(
+                              AppStrings.forMyself,
+                              style: AppTextStyles.buttonMedium.copyWith(
+                                color: _isForSelf ? Colors.white : inactiveColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
-                  Container(width: 1, color: AppColors.getDividerColor(Provider.of<ThemeProvider>(context).isDarkMode)),
                   Expanded(
                     child: GestureDetector(
                       onTap: () {
@@ -357,102 +474,213 @@ class _FortuneUserInfoFormState extends State<FortuneUserInfoForm>
                         _notifyChanges();
                       },
                       child: Container(
-                         color: Colors.transparent,
                         alignment: Alignment.center,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                           decoration: BoxDecoration(
-                              color: !_isForSelf ? AppColors.champagneGold.withOpacity(0.2) : Colors.transparent,
-                              borderRadius: const BorderRadius.horizontal(right: Radius.circular(16)),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.people,
+                              color: !_isForSelf ? Colors.white : inactiveColor,
+                              size: 20,
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            width: double.infinity,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.people, color: !_isForSelf ? AppColors.champagneGold : AppColors.getTextDisabled(Provider.of<ThemeProvider>(context).isDarkMode), size: 18),
-                              const SizedBox(width: 8),
-                              Text(AppStrings.forSomeoneElse, style: PremiumTextStyles.body.copyWith(
-                                color: !_isForSelf ? AppColors.champagneGold : Colors.white54,
-                                fontWeight: !_isForSelf ? FontWeight.bold : FontWeight.normal
-                              )),
-                            ],
-                          ),
+                            const SizedBox(width: 8),
+                            Text(
+                              AppStrings.forSomeoneElse,
+                              style: AppTextStyles.buttonMedium.copyWith(
+                                color: !_isForSelf ? Colors.white : inactiveColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    required bool isDark,
+  }) {
+    final inputTextColor = AppColors.getInputTextColor(isDark);
+    final inputHintColor = AppColors.getInputHintColor(isDark);
+    final inputBgColor = AppColors.getInputBackground(isDark);
+    final inputBorderColor = AppColors.getInputBorderColor(isDark);
+    
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            inputBgColor,
+            inputBgColor.withOpacity(isDark ? 0.05 : 0.8),
           ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: inputBorderColor,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDark ? Colors.black : Colors.grey[400]!).withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        style: AppTextStyles.bodyLarge.copyWith(color: inputTextColor),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(color: inputHintColor),
+          prefixIcon: Icon(icon, color: AppColors.primary.withOpacity(0.7)),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
       ),
     );
   }
 
-  Widget _buildDatePicker() {
+  Widget _buildDatePicker(bool isDark) {
+    final textColor = AppColors.getTextPrimary(isDark);
+    final hintColor = isDark ? Colors.white38 : Colors.grey;
+    final cardBg = isDark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.08);
+    final borderColor = isDark ? Colors.white.withOpacity(0.15) : Colors.grey.withOpacity(0.2);
+    
     return GestureDetector(
       onTap: _pickDate,
-      child: GlassContainer(
-        borderRadius: 16,
+      child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              cardBg,
+              cardBg.withOpacity(0.5),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: borderColor,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: (isDark ? Colors.black : Colors.grey).withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today, color: AppColors.champagneGold, size: 20),
+            Icon(
+              Icons.calendar_today,
+              color: AppColors.primary.withOpacity(0.7),
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 _birthDate == null
                     ? 'Gün / Ay / Yıl'
                     : DateFormat('dd/MM/yyyy').format(_birthDate!),
-                style: PremiumTextStyles.body.copyWith(
-                  color: _birthDate == null ? AppColors.getTextDisabled(Provider.of<ThemeProvider>(context).isDarkMode) : AppColors.getTextPrimary(Provider.of<ThemeProvider>(context).isDarkMode),
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: _birthDate == null ? hintColor : textColor,
                 ),
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: Colors.white38, size: 16),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: hintColor,
+              size: 16,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPickerField({
+  Widget _buildDropdown({
     required String? value,
     required List<String> items,
     required String hint,
     required IconData icon,
-    required String title,
     required ValueChanged<String?> onChanged,
+    required bool isDark,
   }) {
-    return GestureDetector(
-      onTap: () async {
-        final result = await showLiquidGlassPicker(
-          context: context,
-          items: items,
-          initialValue: value,
-          title: title,
-        );
-        if (result != null) onChanged(result);
-      },
-      child: GlassContainer(
-        borderRadius: 16,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.champagneGold, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                value ?? hint,
-                style: PremiumTextStyles.body.copyWith(
-                   color: value != null ? AppColors.getTextPrimary(Provider.of<ThemeProvider>(context).isDarkMode) : AppColors.getTextDisabled(Provider.of<ThemeProvider>(context).isDarkMode),
-                ),
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios, color: Colors.white38, size: 16),
+    final textColor = AppColors.getTextPrimary(isDark);
+    final hintColor = isDark ? Colors.white38 : Colors.grey;
+    final cardBg = isDark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.08);
+    final borderColor = isDark ? Colors.white.withOpacity(0.15) : Colors.grey.withOpacity(0.2);
+    final dropdownBg = AppColors.getCardBackground(isDark);
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cardBg,
+            cardBg.withOpacity(0.5),
           ],
         ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: borderColor,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDark ? Colors.black : Colors.grey).withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primary.withOpacity(0.7), size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: items.contains(value) ? value : null,
+                hint: Text(
+                  hint,
+                  style: TextStyle(color: hintColor, fontSize: 14),
+                ),
+                dropdownColor: dropdownBg,
+                isExpanded: true,
+                icon: Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                style: AppTextStyles.bodyLarge.copyWith(color: textColor),
+                items: items.map((item) {
+                  return DropdownMenuItem(
+                    value: item,
+                    child: Text(item),
+                  );
+                }).toList(),
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

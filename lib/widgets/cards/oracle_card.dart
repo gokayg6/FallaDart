@@ -62,6 +62,7 @@ class _OracleCardState extends State<OracleCard>
   late Animation<double> _floatAnimation;
 
   bool _isFlipped = false;
+  bool _isHovered = false;
 
   @override
   void initState() {

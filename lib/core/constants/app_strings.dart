@@ -180,6 +180,8 @@ class AppStrings {
     'fr': 'Test d\'Amour', 'ru': 'Тест на любовь', 'de': 'Liebestest',
     'ar': 'اختبار الحب', 'fa': 'تست عشق',
   });
+  static String get loveCompatibility => _isEnglish ? 'Love Compatibility' : 'Aşk Uyumu';
+  static String get calculateHarmony => _isEnglish ? 'Calculate Harmony' : 'Uyum Hesapla';
   static String get personalityTest => _tr({
     'tr': 'Kişilik Testi', 'en': 'Personality Test', 'it': 'Test della Personalità',
     'fr': 'Test de Personnalité', 'ru': 'Тест личности', 'de': 'Persönlichkeitstest',
@@ -398,12 +400,30 @@ class AppStrings {
   static String get save => _isEnglish ? 'Save' : 'Kaydet';
   static String get share => _isEnglish ? 'Share' : 'Paylaş';
   static String get shareFailed => _isEnglish ? 'Failed to share' : 'Paylaşım başarısız oldu';
-  static String get back => _isEnglish ? 'Back' : 'Geri';
-  static String get next => _isEnglish ? 'Next' : 'İleri';
-  static String get done => _isEnglish ? 'Done' : 'Tamam';
-  static String get complete => _isEnglish ? 'Complete' : 'Tamamla';
-  static String get cancel => _isEnglish ? 'Cancel' : 'İptal';
-  static String get confirm => _isEnglish ? 'Confirm' : 'Onayla';
+  static String get back => _tr({
+    'tr': 'Geri', 'en': 'Back', 'it': 'Indietro', 'fr': 'Retour',
+    'ru': 'Назад', 'de': 'Zurück', 'ar': 'رجوع', 'fa': 'بازگشت',
+  });
+  static String get next => _tr({
+    'tr': 'İleri', 'en': 'Next', 'it': 'Avanti', 'fr': 'Suivant',
+    'ru': 'Далее', 'de': 'Weiter', 'ar': 'التالي', 'fa': 'بعدی',
+  });
+  static String get done => _tr({
+    'tr': 'Tamam', 'en': 'Done', 'it': 'Fatto', 'fr': 'Fait',
+    'ru': 'Готово', 'de': 'Fertig', 'ar': 'تم', 'fa': 'انجام شد',
+  });
+  static String get complete => _tr({
+    'tr': 'Tamamla', 'en': 'Complete', 'it': 'Completa', 'fr': 'Compléter',
+    'ru': 'Завершить', 'de': 'Abschließen', 'ar': 'إكمال', 'fa': 'تکمیل',
+  });
+  static String get cancel => _tr({
+    'tr': 'İptal', 'en': 'Cancel', 'it': 'Annulla', 'fr': 'Annuler',
+    'ru': 'Отмена', 'de': 'Abbrechen', 'ar': 'إلغاء', 'fa': 'لغو',
+  });
+  static String get confirm => _tr({
+    'tr': 'Onayla', 'en': 'Confirm', 'it': 'Conferma', 'fr': 'Confirmer',
+    'ru': 'Подтвердить', 'de': 'Bestätigen', 'ar': 'تأكيد', 'fa': 'تایید',
+  });
   static String get accept => _isEnglish ? 'Accept' : 'Kabul Et';
   static String get reject => _isEnglish ? 'Reject' : 'Reddet';
   static String get showMore => _isEnglish ? 'Show More' : 'Devamını Gör';
@@ -442,8 +462,11 @@ class AppStrings {
   static String get passwordTooShort => _isEnglish ? 'Password must be at least 6 characters' : 'Şifre en az 6 karakter olmalıdır';
   
   // Navigation
-  static String get home => _isEnglish ? 'Falla' : 'Falla';
-  static String get myFortunes => _isEnglish ? 'My Fortunes' : 'Fallarım';
+  static String get home => 'Falla';
+  static String get myFortunes => _tr({
+    'tr': 'Fallarım', 'en': 'My Fortunes', 'it': 'Le Mie Fortune', 'fr': 'Mes Fortunes',
+    'ru': 'Мои Гадания', 'de': 'Meine Schicksale', 'ar': 'طالعي', 'fa': 'فال‌های من',
+  });
   static String get farm => _isEnglish ? 'Farm' : 'Çiftlik';
   static String get horoscopes => _isEnglish ? 'Horoscopes' : 'Burçlar';
   static String get premium => _isEnglish ? 'Premium' : 'Premium';
@@ -534,13 +557,19 @@ class AppStrings {
   static String get zodiacCompatibility => _isEnglish ? 'Zodiac Compatibility' : 'Burç Uyumluluğu';
   static String get numerology => _isEnglish ? 'Numerology' : 'Numeroloji';
   static String get fortunes => _isEnglish ? 'Fortunes' : 'Fallar';
-  static String get profile => _isEnglish ? 'Profile' : 'Profil';
+  static String get profile => _tr({
+    'tr': 'Profil', 'en': 'Profile', 'it': 'Profilo', 'fr': 'Profil',
+    'ru': 'Профиль', 'de': 'Profil', 'ar': 'الملف الشخصي', 'fa': 'پروفایل',
+  });
   static String get signedOut => _isEnglish ? 'Signed out' : 'Çıkış yapıldı';
   static String get totalFortunes => _isEnglish ? 'Total Fortunes' : 'Toplam Fal';
   static String get dailyFortunes => _isEnglish ? 'Daily Fortunes' : 'Günlük Fallar';
   static String get memberSince => _isEnglish ? 'Member Since' : 'Üyelik Tarihi';
   static String get lastLogin => _isEnglish ? 'Last Login' : 'Son Giriş';
-  static String get settings => _isEnglish ? 'Settings' : 'Ayarlar';
+  static String get settings => _tr({
+    'tr': 'Ayarlar', 'en': 'Settings', 'it': 'Impostazioni', 'fr': 'Paramètres',
+    'ru': 'Настройки', 'de': 'Einstellungen', 'ar': 'الإعدادات', 'fa': 'تنظیمات',
+  });
   static String get notifications => _isEnglish ? 'Notifications' : 'Bildirimler';
   static String get privacy => _isEnglish ? 'Privacy' : 'Gizlilik';
   static String get help => _isEnglish ? 'Help' : 'Yardım';
@@ -606,7 +635,10 @@ class AppStrings {
   static String get startFirstFortune => _isEnglish ? 'Start your first fortune' : 'İlk falını başlat';
   static String get statistics => _isEnglish ? 'Statistics' : 'İstatistikler';
   static String get cards => _isEnglish ? 'cards' : 'kartlar';
-  static String get social => _isEnglish ? 'Social' : 'Sosyal';
+  static String get social => _tr({
+    'tr': 'Sosyal', 'en': 'Social', 'it': 'Social', 'fr': 'Social',
+    'ru': 'Социальное', 'de': 'Sozial', 'ar': 'اجتماعي', 'fa': 'اجتماعی',
+  });
   
   // Ana sayfa - Rüya bölümü
   static String get drawMyDream => _isEnglish ? 'Draw My Dream' : 'Rüyamı Çiz';
@@ -1133,7 +1165,10 @@ class AppStrings {
   static String get profileInfoWillBeDeleted => _isEnglish ? 'Your profile information will be deleted' : 'Profil bilgileriniz silinecek';
   static String get cannotAccessAccountAgain => _isEnglish ? 'You will not be able to access this account again' : 'Bu hesaba tekrar erişemeyeceksiniz';
   static String get areYouSureSignOut => _isEnglish ? 'Are you sure you want to sign out?' : 'Çıkış yapmak istediğinize emin misiniz?';
-  static String get deleteAccount => _isEnglish ? 'Delete Account' : 'Hesabı Sil';
+  static String get deleteAccount => _tr({
+    'tr': 'Hesabı Sil', 'en': 'Delete Account', 'it': 'Elimina Account', 'fr': 'Supprimer Compte',
+    'ru': 'Удалить аккаунт', 'de': 'Konto Löschen', 'ar': 'حذف الحساب', 'fa': 'حذف حساب',
+  });
   static String get thisActionCannotBeUndone => _isEnglish ? 'This action cannot be undone!' : 'Bu işlem geri alınamaz!';
   static String get areYouSureDeleteAccount => _isEnglish ? 'Are you sure you want to delete your account?\n\n' : 'Hesabınızı silmek istediğinizden emin misiniz?\n\n';
   static String get allPersonalDataWillBeDeleted => _isEnglish ? '• All your personal data will be deleted\n' : '• Tüm kişisel verileriniz silinecek\n';
@@ -1145,7 +1180,22 @@ class AppStrings {
   static String get errorDeletingAccount => _isEnglish ? 'An error occurred while deleting the account.' : 'Hesap silinirken bir hata oluştu.';
   static String get errorDeletingAccountWithError => _isEnglish ? 'Error occurred while deleting account:' : 'Hesap silinirken hata oluştu:';
   static String get profileLoading => _isEnglish ? 'Loading profile...' : 'Profil yükleniyor...';
-  static String get themeSettings => _isEnglish ? 'Theme Settings' : 'Tema Ayarları';
+  static String get themeSettings => _tr({
+    'tr': 'Tema', 'en': 'Theme', 'it': 'Tema', 'fr': 'Thème',
+    'ru': 'Тема', 'de': 'Thema', 'ar': 'مظهر', 'fa': 'تم',
+  });
+  static String get language => _tr({
+    'tr': 'Dil', 'en': 'Language', 'it': 'Lingua', 'fr': 'Langue',
+    'ru': 'Язык', 'de': 'Sprache', 'ar': 'لغة', 'fa': 'زبان',
+  });
+  static String get areYouSure => _tr({
+    'tr': 'Emin misin?', 'en': 'Are you sure?', 'it': 'Sei sicuro?', 'fr': 'Êtes-vous sûr?',
+    'ru': 'Вы уверены?', 'de': 'Bist du sicher?', 'ar': 'هل أنت متأكد؟', 'fa': 'آیا مطمئن هستید؟',
+  });
+  static String get delete => _tr({
+    'tr': 'Sil', 'en': 'Delete', 'it': 'Elimina', 'fr': 'Supprimer',
+    'ru': 'Удалить', 'de': 'Löschen', 'ar': 'حذف', 'fa': 'حذف',
+  });
   static String get darkTheme => _isEnglish ? 'Dark Theme' : 'Karanlık Tema';
   static String get lightTheme => _isEnglish ? 'Light Theme' : 'Aydınlık Tema';
   static String get mysticalMode => _isEnglish ? 'Mystical Mode' : 'Mistik Mod';
@@ -1205,7 +1255,18 @@ class AppStrings {
   static String get registrationFailed => _isEnglish ? 'Registration failed' : 'Kayıt başarısız';
   static String get alreadyHaveAccount => _isEnglish ? 'Already have an account? ' : 'Zaten hesabın var mı? ';
   static String get verifyingIdentity => _isEnglish ? 'Verifying identity...' : 'Kimlik doğrulanıyor...';
-  static String get selectLanguage => _isEnglish ? 'Select Language' : 'Dil Seç';
+  static String get selectLanguage => _tr({
+    'tr': 'Dil Seç', 'en': 'Select Language', 'it': 'Seleziona Lingua', 'fr': 'Choisir la Langue',
+    'ru': 'Выбрать язык', 'de': 'Sprache wählen', 'ar': 'اختر اللغة', 'fa': 'انتخاب زبان',
+  });
+  static String get selectZodiac => _tr({
+    'tr': 'Burç Seç', 'en': 'Select Zodiac', 'it': 'Seleziona Segno', 'fr': 'Choisir Signe',
+    'ru': 'Выбрать знак', 'de': 'Sternzeichen w.', 'ar': 'اختر البرج', 'fa': 'انتخاب برج',
+  });
+  static String get selectGender => _tr({
+    'tr': 'Cinsiyet Seç', 'en': 'Select Gender', 'it': 'Seleziona Genere', 'fr': 'Choisir Genre',
+    'ru': 'Выбрать пол', 'de': 'Geschlecht w.', 'ar': 'اختر الجنس', 'fa': 'انتخاب جنسیت',
+  });
 
   // Astrology Screens
   static String get notSpecified => _isEnglish ? 'Not Specified' : 'Belirtilmemiş';

@@ -7,7 +7,6 @@ import '../../core/providers/user_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../core/widgets/mystical_loading.dart';
 import '../auth/login_screen.dart';
-import 'edit_profile_screen.dart';
 
 class FixedProfileScreen extends StatefulWidget {
   const FixedProfileScreen({Key? key}) : super(key: key);
@@ -57,11 +56,15 @@ class _FixedProfileScreenState extends State<FixedProfileScreen>
       await userProvider.signOut();
       
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Çıkış yapıldı'),
+            backgroundColor: Colors.green,
+          ),
+        );
         // Go to login screen
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => const LoginScreen(showSignOutSuccess: true),
-          ),
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
           (route) => false,
         );
       }
@@ -430,10 +433,7 @@ class _FixedProfileScreenState extends State<FixedProfileScreen>
                 borderColor: AppColors.primary,
                 textColor: textColor,
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-              );
+              // TODO: Navigate to edit profile screen
             },
                 isDark: isDark,
           ),
@@ -456,10 +456,7 @@ class _FixedProfileScreenState extends State<FixedProfileScreen>
             if (userProvider.user != null) {
               _signOut();
             } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-              );
+              // TODO: Navigate to sign in screen
             }
           },
           isLoading: _isLoading,
@@ -615,7 +612,7 @@ class _FixedProfileScreenState extends State<FixedProfileScreen>
           onChanged: (value) {
             themeProvider.toggleTheme();
           },
-          activeColor: AppColors.primary,
+          activeThumbColor: AppColors.primary,
         ),
       ],
     );

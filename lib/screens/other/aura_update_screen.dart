@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -39,7 +38,6 @@ class _AuraUpdateScreenState extends State<AuraUpdateScreen> with SingleTickerPr
   double? _auraFrequency;
   String? _auraDescription;
   bool _isLoading = false;
-  bool _auraUpdated = false; // Track if aura was updated
 
   List<String> get _moods => [
     AppStrings.happy,
@@ -320,7 +318,6 @@ class _AuraUpdateScreenState extends State<AuraUpdateScreen> with SingleTickerPr
         _auraColorName = colorName;
         _auraFrequency = frequency;
         _auraDescription = description;
-        _auraUpdated = true; // Mark as updated
       });
 
       // Scroll to result
@@ -331,11 +328,7 @@ class _AuraUpdateScreenState extends State<AuraUpdateScreen> with SingleTickerPr
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeOutCubic,
           );
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Error scrolling to bottom: $e');
-          }
-        }
+        } catch (_) {}
       });
     } catch (e) {
       if (!mounted) return;
@@ -354,23 +347,12 @@ class _AuraUpdateScreenState extends State<AuraUpdateScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    // 3.0 saniye sonra otomatik geçiş
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
-    });
-
     final themeProvider = Provider.of<ThemeProvider>(context);
     
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: themeProvider.backgroundGradient,
-        ),
+        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
         child: SafeArea(
           child: Column(
             children: [
@@ -422,7 +404,7 @@ class _AuraUpdateScreenState extends State<AuraUpdateScreen> with SingleTickerPr
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Navigator.pop(context, _auraUpdated),
+            onPressed: () => Navigator.pop(context),
             icon: Icon(Icons.arrow_back, color: textColor),
           ),
           const SizedBox(width: 8),

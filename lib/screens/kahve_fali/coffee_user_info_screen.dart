@@ -164,14 +164,16 @@ class _CoffeeUserInfoScreenState extends State<CoffeeUserInfoScreen> {
     final isDark = themeProvider.isDarkMode;
 
     return Scaffold(
-      backgroundColor: AppColors.getBackground(isDark),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Bilgilerini Doldur'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
       ),
-      body: ListView(
+      body: Container(
+        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
+        child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
         children: [
           Consumer<ThemeProvider>(
@@ -362,6 +364,7 @@ class _CoffeeUserInfoScreenState extends State<CoffeeUserInfoScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -394,14 +397,16 @@ class ReaderSelectScreen extends StatelessWidget {
     final isDark = themeProvider.isDarkMode;
     
     return Scaffold(
-      backgroundColor: AppColors.getBackground(isDark),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: AppColors.getTextPrimary(isDark),
         elevation: 0,
         title: Text("Falcı Seç", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.getTextPrimary(isDark))),
       ),
-      body: ListView.builder(
+      body: Container(
+        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
+        child: ListView.builder(
         itemCount: readers.length,
         itemBuilder: (ctx, i) {
           final r = readers[i];
@@ -492,6 +497,7 @@ class ReaderSelectScreen extends StatelessWidget {
           );
         },
       ),
+      ),
     );
   }
 }
@@ -514,14 +520,16 @@ class _SelectScreen extends StatelessWidget {
     final textColor = AppColors.getTextPrimary(isDark);
     
     return Scaffold(
-      backgroundColor: AppColors.getBackground(isDark),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: textColor,
         elevation: 0,
         title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
       ),
-      body: ListView(
+      body: Container(
+        decoration: BoxDecoration(gradient: themeProvider.backgroundGradient),
+        child: ListView(
         children: options.map((e) {
           bool sel = selected == e["label"];
           return ListTile(
@@ -539,6 +547,7 @@ class _SelectScreen extends StatelessWidget {
             onTap: () => Navigator.pop(context, e["label"]),
           );
         }).toList(),
+      ),
       ),
     );
   }
